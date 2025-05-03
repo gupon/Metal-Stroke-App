@@ -1,21 +1,19 @@
-//
-//  ContentView.swift
-//  250425MetalTriangle
-//
-//  Created by Takuma Miyamoto on 2025/04/25.
-//
-
 import SwiftUI
+import MetalKit
 
 struct ContentView: View {
+    @StateObject var renderer = Renderer()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ZStack(alignment: .topLeading) {
+            MetalView()
+                .frame(minWidth: 640, minHeight: 640)
+                .environmentObject(renderer)
+            Text("FPS \(renderer.fps, specifier: "%.2f")")
+                .foregroundColor(.white)
+                .padding()
         }
-        .padding()
+        .padding(60)
     }
 }
 
