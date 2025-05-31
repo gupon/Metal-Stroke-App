@@ -43,11 +43,22 @@ class MyMTKView: MTKView {
         addPoint(pos: convert(event.locationInWindow, from: nil))
     }
     
+    override func rightMouseDown(with event: NSEvent) {
+        super.rightMouseDown(with: event)
+        clearPoints()
+    }
+    
     /*
     override func mouseUp(with event: NSEvent) {
         super.mouseUp(with: event)
     }
     */
+    
+    private func clearPoints() {
+        points.removeAll()
+        renderer?.vertices = points
+        renderer?.isDirty = true
+    }
     
     private func addPoint(pos: NSPoint) {
         var texPos = SIMD2<Float>(
