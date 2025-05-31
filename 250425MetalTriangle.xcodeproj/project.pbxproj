@@ -35,16 +35,6 @@
 			path = 250425MetalTriangle;
 			sourceTree = "<group>";
 		};
-		6FD6B5432DBB87C1007964FB /* 250425MetalTriangleTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = 250425MetalTriangleTests;
-			sourceTree = "<group>";
-		};
-		6FD6B54D2DBB87C1007964FB /* 250425MetalTriangleUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = 250425MetalTriangleUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,8 +66,6 @@
 			isa = PBXGroup;
 			children = (
 				6FD6B5312DBB87C0007964FB /* 250425MetalTriangle */,
-				6FD6B5432DBB87C1007964FB /* 250425MetalTriangleTests */,
-				6FD6B54D2DBB87C1007964FB /* 250425MetalTriangleUITests */,
 				6FD6B5302DBB87C0007964FB /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,9 +118,6 @@
 			dependencies = (
 				6FD6B5422DBB87C1007964FB /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				6FD6B5432DBB87C1007964FB /* 250425MetalTriangleTests */,
-			);
 			name = 250425MetalTriangleTests;
 			packageProductDependencies = (
 			);
@@ -152,9 +137,6 @@
 			);
 			dependencies = (
 				6FD6B54C2DBB87C1007964FB /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				6FD6B54D2DBB87C1007964FB /* 250425MetalTriangleUITests */,
 			);
 			name = 250425MetalTriangleUITests;
 			packageProductDependencies = (
