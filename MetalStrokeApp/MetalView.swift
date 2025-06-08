@@ -1,17 +1,32 @@
 import SwiftUI
 import MetalKit
 
+/*
+ Bridge for SwiftUI <-> AppKit
+ 
+ MetalView: SwiftUI(NSViewRepresentable)
+ MyMTKView: AppKit(NSView)
+ 
+*/
+
 struct MetalView: NSViewRepresentable {
-    @EnvironmentObject var renderer: Renderer
+    @EnvironmentObject var data: StrokeBufferManager
+    
+    // draw properties from contentView
+    @Binding var strokeWidth: Float
+    @Binding var showWireFrame: Bool
     
     func makeCoordinator() -> Renderer {
-        renderer
+        return Renderer(data)
     }
     
-    func updateNSView(_ nsView: MTKView, context: Context) {}
+    func updateNSView(_ nsView: MTKView, context: Context) {
+        data.setStrokeWidth(strokeWidth)
+        context.coordinator.setWireframe(showWireFrame)
+    }
     
     func makeNSView(context: Context) -> MTKView {
-        let view = MyMTKView(frame:NSRect.zero , device: context.coordinator.device)
+        let view = MyMTKView(frame:NSRect.zero , device: context.coordinator.device, data: self.data)
         view.clearColor = MTLClearColor(red: 0.1, green: 0, blue: 0.2, alpha: 1.0)
         view.delegate = context.coordinator
         view.renderer = context.coordinator
@@ -30,8 +45,20 @@ struct MetalView: NSViewRepresentable {
 }
 
 class MyMTKView: MTKView {
-    private var points:[SIMD2<Float>] = []
     weak var renderer: Renderer?
+    
+    private var points:[SIMD2<Float>] = []
+    private var data: StrokeBufferManager
+    
+    init(frame frameRect: CGRect, device: (any MTLDevice)?, data:StrokeBufferManager) {
+        self.data = data
+        super.init(frame: frameRect, device: device)
+    }
+    
+    required init(coder: NSCoder) {
+        self.data = StrokeBufferManager()
+        super.init(coder: coder)
+    }
     
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
@@ -56,8 +83,8 @@ class MyMTKView: MTKView {
     
     private func clearPoints() {
         points.removeAll()
-        renderer?.vertices = points
-        renderer?.isDirty = true
+        data.vertices = points
+        data.isDirty = true
     }
     
     private func addPoint(pos: NSPoint) {
@@ -70,15 +97,17 @@ class MyMTKView: MTKView {
         
         points.append(texPos)
         
-        renderer?.vertices = points
-        renderer?.isDirty = true
+        data.vertices = points
+        data.isDirty = true
 //        print(points)
     }
     
 }
 
+/*
 #Preview {
     MetalView()
         .frame(minWidth: 640, minHeight: 640)
         .environmentObject(Renderer())
 }
+*/

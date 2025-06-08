@@ -71,11 +71,15 @@ vertex VtxOut vtx_main(
     pos += v0.pos;
     
     out.pos = float4(pos, 0, 1);
-//    out.color = mix(v0.color, v1.color, localpos.y);
-    out.color = ((vid + 1) % 4) < 2 ? float4(1,0,0,0) : float4(0,0,1,1);
-    if (drawMode == 1) {
+    
+    if (drawMode == 0) {
+        // fill
+        out.color = ((vid + 1) % 4) < 2 ? float4(1,0,0,0) : float4(0,0,1,1);
+        // out.color = mix(v0.color, v1.color, localpos.y);
+    } else if (drawMode == 1) {
+        // wireframe
         out.color = float4(1,1,1,1);
-//        out.pos.z += 0.1;
+        out.pos.z += 0.1;
     }
     
     return out;

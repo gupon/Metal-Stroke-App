@@ -2,22 +2,26 @@ import SwiftUI
 import MetalKit
 
 struct ContentView: View {
-    @StateObject var renderer = Renderer()
+    @StateObject var data = StrokeBufferManager()
     
     @State private var strokeWidth:Float = 1.0
     @State private var showWireFrame:Bool = true
     
-    
     var body: some View {
         VStack {
             ZStack(alignment: .topLeading) {
-                MetalView()
-                //                .frame(minWidth: 640, minHeight: 640)
-                    .environmentObject(renderer)
-                
+                MetalView(
+                    strokeWidth: $strokeWidth,
+                    showWireFrame: $showWireFrame
+                )
+                    .environmentObject(data)
+//                  .frame(minWidth: 640, minHeight: 640)
+
+                /*
                 Text("FPS \(renderer.fps, specifier: "%.2f")")
                     .foregroundColor(.white)
                     .padding()
+                 */
             }
             
             HStack {
@@ -27,9 +31,6 @@ struct ContentView: View {
                 )
                 .frame(width: 240)
                 .padding()
-                .onChange(of: strokeWidth) {
-                    renderer.setStrokeWidth(strokeWidth)
-                }
                 
                 Text("Width: \(strokeWidth, specifier: "%.1f")")
                     .font(.custom("Monaco", size: 14))
@@ -38,9 +39,6 @@ struct ContentView: View {
                 
                 Toggle("Wireframe", isOn: $showWireFrame)
                     .padding()
-                    .onChange(of: showWireFrame) {
-                        renderer.setWireframe(showWireFrame)
-                    }
             }
         }
     }

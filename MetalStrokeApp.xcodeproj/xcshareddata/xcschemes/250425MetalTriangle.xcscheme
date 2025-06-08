@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6FD6B52E2DBB87C0007964FB"
-               BuildableName = "250425MetalTriangle.app"
-               BlueprintName = "250425MetalTriangle"
-               ReferencedContainer = "container:250425MetalTriangle.xcodeproj">
+               BuildableName = "MetalStrokeApp.app"
+               BlueprintName = "MetalStrokeApp"
+               ReferencedContainer = "container:MetalStrokeApp.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -36,9 +36,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6FD6B53F2DBB87C1007964FB"
-               BuildableName = "250425MetalTriangleTests.xctest"
-               BlueprintName = "250425MetalTriangleTests"
-               ReferencedContainer = "container:250425MetalTriangle.xcodeproj">
+               BuildableName = "MetalStrokeAppTests.xctest"
+               BlueprintName = "MetalStrokeAppTests"
+               ReferencedContainer = "container:MetalStrokeApp.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -47,9 +47,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6FD6B5492DBB87C1007964FB"
-               BuildableName = "250425MetalTriangleUITests.xctest"
-               BlueprintName = "250425MetalTriangleUITests"
-               ReferencedContainer = "container:250425MetalTriangle.xcodeproj">
+               BuildableName = "MetalStrokeAppUITests.xctest"
+               BlueprintName = "MetalStrokeAppUITests"
+               ReferencedContainer = "container:MetalStrokeApp.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "6FD6B52E2DBB87C0007964FB"
-            BuildableName = "250425MetalTriangle.app"
-            BlueprintName = "250425MetalTriangle"
-            ReferencedContainer = "container:250425MetalTriangle.xcodeproj">
+            BuildableName = "MetalStrokeApp.app"
+            BlueprintName = "MetalStrokeApp"
+            ReferencedContainer = "container:MetalStrokeApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -86,9 +86,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "6FD6B52E2DBB87C0007964FB"
-            BuildableName = "250425MetalTriangle.app"
-            BlueprintName = "250425MetalTriangle"
-            ReferencedContainer = "container:250425MetalTriangle.xcodeproj">
+            BuildableName = "MetalStrokeApp.app"
+            BlueprintName = "MetalStrokeApp"
+            ReferencedContainer = "container:MetalStrokeApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
