@@ -5,7 +5,7 @@ struct ContentView: View {
     @StateObject var data = StrokeBufferManager()
     
     @State private var strokeWidth:Float = 1.0
-    @State private var showWireFrame:Bool = true
+    @State private var showWireFrame:Bool = false
     
     var body: some View {
         VStack {

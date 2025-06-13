@@ -2,27 +2,45 @@ import MetalKit
 
 class StrokeBufferManager: ObservableObject {
     
+    class Stroke {
+        var vertices: [Vertex]
+        var width: Float
+        var color: NSColor
+        
+        init(vertices: [Vertex]=[], width: Float, color: NSColor) {
+            self.vertices = vertices
+            self.width = width
+            self.color = color
+        }
+    }
+    
+    struct Vertex {
+        // align in 16B
+        var position: SIMD2<Float> = .zero  // 8B
+        var color: SIMD4<Float> = .zero     // 16B
+        var radius: Float = 0               // 4B
+        var end: Float = 0                  // 4B (-1:start, 0:mid, 1:end)
+    }
+    
+    private var currentStroke: Stroke?
+    private var strokes:[Stroke] = []
+    
     public var vertices: [SIMD2<Float>] = []
     private(set) var vertexCount: Int = 0
     
     public var isDirty: Bool = false
     
     private var strokeWidth: Float = 1
+    private var strokeWidthScale: Float = 1
     
     // buffer chunks
     private let BFFR_CHNK_SIZE: Int = 300
     private var currChunkNum: Int = 0
     private var vertexBuffer: MTLBuffer?
     
-    struct StrokeVertex {
-        // align in 16B
-        var position: SIMD2<Float>  // 8B
-        var color: SIMD4<Float>     // 16B
-        var radius: Float           // 4B
-        var end: Float              // 4B
-    }
-    
-    static let VTX_STRIDE = MemoryLayout<StrokeVertex>.stride
+
+    static let VTX_STRIDE = MemoryLayout<Vertex>.stride
+    static let VTX_EMPTY = Vertex()
     
     public func getVertexDescriptor() -> MTLVertexDescriptor {
         // vertex descriptor
@@ -59,74 +77,126 @@ class StrokeBufferManager: ObservableObject {
     }
     
     
+    /*
+     Vertex Buffer APIs
+     */
+    public func markEndVertices() {
+        var end: Float = 0
+        strokes.forEach() { stroke in
+            if stroke.vertices.count > 1 {
+                for i in 0 ..< stroke.vertices.count {
+                    switch i {
+                        case 0: end = -1
+                        case stroke.vertices.count - 1: end = 1
+                        default: end = 0
+                    }
+                    stroke.vertices[i].end = end
+                }
+            }
+        }
+    }
+    
+    // update buffer by current state of Strokes
     public func updateBuffer(device: MTLDevice) {
-        if (!isDirty) {return}
+        guard isDirty else { return }
         
-        let newChunkNum = (vertices.count + BFFR_CHNK_SIZE - 1) / BFFR_CHNK_SIZE
+        markEndVertices()
+        let allVertices = strokes.flatMap{ $0.vertices }
+        let newVertexNum = strokes.reduce(0){ $0 + $1.vertices.count }
+        
+        let newChunkNum = (newVertexNum + BFFR_CHNK_SIZE - 1) / BFFR_CHNK_SIZE
         let newCapacity = newChunkNum * BFFR_CHNK_SIZE
         
         // expand buffer if necesarry
         if currChunkNum < newChunkNum {
-            let oldBuffer = vertexBuffer
             vertexBuffer = device.makeBuffer(length: newCapacity * StrokeBufferManager.VTX_STRIDE)
-            
-            if let oldPtr = oldBuffer?.contents().bindMemory(to: StrokeVertex.self, capacity: vertexCount),
-               let newPtr = vertexBuffer?.contents().bindMemory(to: StrokeVertex.self, capacity: newCapacity)
-            {
-                // copy exsiting points to new buffer
-                for i in 0..<vertexCount {
-                    newPtr[i] = oldPtr[i]
-                }
-                
-                // initialize new capacity left
-                let sv = StrokeVertex(position: .zero, color: .zero, radius: .zero, end: .zero)
-                (newPtr + vertexCount).initialize(repeating: sv, count: newCapacity - vertexCount)
-            }
-            
             currChunkNum = newChunkNum
             print("____BUMP UP CHUNK: \(newCapacity)")
         }
         
-        // copy new points
-        if (vertices.count > vertexCount + 2) {
-            print("points: \(vertices.count), new: \(vertices.count - vertexCount)")
-        }
-        
-        if let ptr = vertexBuffer?.contents().bindMemory(to: StrokeVertex.self, capacity: newCapacity)
+        if let ptr = vertexBuffer?.contents().bindMemory(to: Vertex.self, capacity: newCapacity)
         {
-            let rad: Float = strokeWidth * 0.2
-            for i in 0..<vertices.count {
-                var end: Float = 0
-                if (i == 0) {end = -1} else if (i == vertices.count-1) {end = 1}
-                
-                ptr[i] = StrokeVertex(
-                    position: vertices[i],
-                    color: SIMD4<Float>(1,0,0,1),
-                    radius: rad,
-                    end: end
-                )
+            for (i, vertex) in allVertices.enumerated() {
+                ptr[i] = vertex
+                ptr[i].radius *= strokeWidthScale
             }
+            
+            (ptr + newVertexNum).initialize(
+                repeating: StrokeBufferManager.VTX_EMPTY,
+                count: newCapacity - newVertexNum
+            )
         }
         
-        vertexCount = vertices.count
+        vertexCount = newVertexNum
         isDirty = false
     }
-    
-    
-    func addPoint(p: NSPoint) {
-        isDirty = true
-    }
-    
-    
-    func setStrokeWidth (_ value:Float){
-        if (self.strokeWidth != value) {
-            self.strokeWidth = value
-            self.isDirty = true
-        }
-    }
-    
     
     func getVertexBuffer() -> MTLBuffer? {
         return vertexCount > 1 ? vertexBuffer : nil
     }
+
+    
+    
+    /*
+     Drawing APIs
+     */
+    
+    func startStroke(color: NSColor = .blue, width:Float = 0.1) {
+        let stroke = Stroke(width: width, color: color)
+        currentStroke = stroke
+        strokes.append(stroke)
+        
+//        isDirty = true
+        print("start stroke: \(strokes.count)")
+    }
+    
+    func addPoint(pos: SIMD2<Float>, color: SIMD4<Float>, radius: Float=0.05) {
+        let firstPoint = currentStroke == nil
+        if firstPoint {
+            startStroke()
+        }
+        
+        if let stroke = currentStroke {
+            let vert = Vertex(
+                position: pos,
+                color: color,
+                radius: radius
+            )
+            stroke.vertices.append(vert)
+            isDirty = true
+        }
+        
+        print("stroke: \(strokes.count), vert: \(currentStroke!.vertices.count)")
+//        strokes.forEach { str in print(str.vertices) }
+    }
+    
+    func endStroke() {
+        currentStroke = nil
+        isDirty = true
+        print("end stroke: \(strokes.count)")
+    }
+    
+    
+    func setStrokeWidthScale (_ value: Float){
+        if (self.strokeWidthScale != value) {
+            self.strokeWidthScale = value
+            self.isDirty = true
+        }
+    }
+    
+    func setFinalRadius (_ value: Float) {
+        if let stroke = currentStroke {
+            stroke.vertices[stroke.vertices.count - 1].radius = value
+            self.isDirty = true
+        }
+    }
+    
+    func clearAll() {
+        strokes.removeAll()
+        vertices.removeAll()
+        currentStroke = nil
+        vertexCount = 0
+        self.isDirty = true
+    }
+    
 }

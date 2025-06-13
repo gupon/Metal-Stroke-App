@@ -33,6 +33,13 @@ vertex VtxOut vtx_main(
     StrokeVertex v0 = vertices[iid];
     StrokeVertex v1 = vertices[iid + 1];
     
+    // skip drawing if end
+    if (v0.end == 1) {
+        out.color = float4(0);
+        out.pos = float4(v0.pos, 0, 1);
+        return out;
+    }
+
     float2 dp = v1.pos - v0.pos;
     float sy = length(dp);
     float angle = atan2(dp.y, dp.x) - PIH;
@@ -52,17 +59,23 @@ vertex VtxOut vtx_main(
         rotend = 1;
     }
     
-    float angle2 = atan2(dp.y, dp.x) - PIH;
-    angle2 = (angle + angle2) * 0.5;
-    if (abs(angle - angle2) > PIH) {
-        angle2 += -sign(angle2) * PI;
+    float angleB = atan2(dp.y, dp.x) - PIH;
+    angleB = (angle + angleB) * 0.5;
+    
+    float dangle = angle - angleB;
+    if (abs(dangle) > PIH) {
+        angleB += -sign(angleB) * PI;
+        dangle = angle - angleB;
     }
     
     // pos(x only)
-    float2 pos = float2(mix(v0.radius, v1.radius, localpos.y) * localpos.x, 0);
+    float2 pos = float2(mix(v0.radius, v1.radius, localpos.y) * localpos.x * 2, 0);
     
     // rotate ends first
-    pos = rotate(pos, rotend ? angle2 : angle);
+    if (rotend) {
+        pos *= 1. / cos(abs(dangle));
+    }
+    pos = rotate(pos, rotend ? angleB : angle);
     
     // add y component
     pos += rotate(float2(0, localpos.y * sy), angle);
@@ -70,12 +83,14 @@ vertex VtxOut vtx_main(
     // translate by start pos
     pos += v0.pos;
     
+    
+    // form out
     out.pos = float4(pos, 0, 1);
     
     if (drawMode == 0) {
         // fill
         out.color = ((vid + 1) % 4) < 2 ? float4(1,0,0,0) : float4(0,0,1,1);
-        // out.color = mix(v0.color, v1.color, localpos.y);
+         out.color = mix(v0.color, v1.color, localpos.y);
     } else if (drawMode == 1) {
         // wireframe
         out.color = float4(1,1,1,1);

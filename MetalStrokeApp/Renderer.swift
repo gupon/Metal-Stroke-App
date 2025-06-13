@@ -46,7 +46,7 @@ class Rectangle {
 
 
 
-class Renderer: NSObject, MTKViewDelegate, ObservableObject {
+class Renderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
     private let cmdQueue: MTLCommandQueue
     private var pipelineState: MTLRenderPipelineState?
