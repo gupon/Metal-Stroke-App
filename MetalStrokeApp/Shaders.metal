@@ -14,12 +14,40 @@ struct StrokeVertex {
 struct VtxOut {
     float4 pos [[position]];
     float4 color;
+    float ptsize [[point_size]] = 6.0;
 };
 
 float2 rotate(float2 pos, float angle) {
     return float2(pos.x * cos(angle) - pos.y * sin(angle),
                   pos.x * sin(angle) + pos.y * cos(angle));
 }
+
+
+/*
+ for debug wireframes / points
+ */
+vertex VtxOut vtx_debug(
+    const device StrokeVertex* vertices[[buffer(0)]],
+    uint vid [[vertex_id]],
+    constant uint& drawStep [[buffer(3)]]
+) {
+    VtxOut out;
+    
+    StrokeVertex vtx = vertices[vid];
+    out.pos = float4(vtx.pos, 0.2, 1);
+    
+    if (drawStep == 0) {
+        out.color = float4(1,1,1,1);
+        out.ptsize = 16.0;
+    } else if (drawStep == 1) {
+        out.color = vtx.color;
+        out.ptsize = 14.0;
+        out.pos.z += 0.2;
+    }
+    
+    return out;
+}
+
 
 vertex VtxOut vtx_main(
     const device StrokeVertex* vertices[[buffer(0)]],
@@ -83,17 +111,16 @@ vertex VtxOut vtx_main(
     // translate by start pos
     pos += v0.pos;
     
-    
     // form out
     out.pos = float4(pos, 0, 1);
     
     if (drawMode == 0) {
         // fill
         out.color = ((vid + 1) % 4) < 2 ? float4(1,0,0,0) : float4(0,0,1,1);
-         out.color = mix(v0.color, v1.color, localpos.y);
+        out.color = mix(v0.color, v1.color, localpos.y);
     } else if (drawMode == 1) {
         // wireframe
-        out.color = float4(1,1,1,1);
+        out.color = float4(1,1,1,0.5);
         out.pos.z += 0.1;
     }
     

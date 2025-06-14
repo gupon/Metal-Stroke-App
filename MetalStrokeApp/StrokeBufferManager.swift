@@ -2,6 +2,9 @@ import MetalKit
 
 class StrokeBufferManager: ObservableObject {
     
+    static let VTX_STRIDE = MemoryLayout<Vertex>.stride
+    static let VTX_EMPTY = Vertex()
+
     class Stroke {
         var vertices: [Vertex]
         var width: Float
@@ -25,22 +28,20 @@ class StrokeBufferManager: ObservableObject {
     private var currentStroke: Stroke?
     private var strokes:[Stroke] = []
     
-    public var vertices: [SIMD2<Float>] = []
+    // current buffer state
     private(set) var vertexCount: Int = 0
-    
-    public var isDirty: Bool = false
-    
-    private var strokeWidth: Float = 1
-    private var strokeWidthScale: Float = 1
-    
-    // buffer chunks
     private let BFFR_CHNK_SIZE: Int = 300
     private var currChunkNum: Int = 0
     private var vertexBuffer: MTLBuffer?
     
+    private(set) var centerLineIndexCount = 0
+    private(set) var centerLineIndexBuffer:MTLBuffer?
+    
 
-    static let VTX_STRIDE = MemoryLayout<Vertex>.stride
-    static let VTX_EMPTY = Vertex()
+    public var isDirty: Bool = false
+    
+    private var strokeWidthScale: Float = 1
+    
     
     public func getVertexDescriptor() -> MTLVertexDescriptor {
         // vertex descriptor
@@ -127,14 +128,38 @@ class StrokeBufferManager: ObservableObject {
             )
         }
         
+        updateCenterIndexBuffer(device: device)
+        
         vertexCount = newVertexNum
         isDirty = false
+    }
+    
+    func updateCenterIndexBuffer(device: MTLDevice) {
+        guard strokes.count > 0 else { return }
+        
+        var idx_off: Int = 0
+        var indices: [UInt16] = []
+        
+        for stroke in strokes {
+            guard stroke.vertices.count > 1 else {continue}
+            
+            for i in 1 ..< stroke.vertices.count {
+                indices.append(UInt16(idx_off + i - 1))
+                indices.append(UInt16(idx_off + i))
+            }
+            idx_off += stroke.vertices.count
+        }
+        
+        guard indices.count > 1 else { return }
+        
+        self.centerLineIndexCount = indices.count
+        self.centerLineIndexBuffer =  device
+            .makeBuffer( bytes: indices, length: indices.count * MemoryLayout<UInt16>.size )
     }
     
     func getVertexBuffer() -> MTLBuffer? {
         return vertexCount > 1 ? vertexBuffer : nil
     }
-
     
     
     /*
@@ -193,7 +218,6 @@ class StrokeBufferManager: ObservableObject {
     
     func clearAll() {
         strokes.removeAll()
-        vertices.removeAll()
         currentStroke = nil
         vertexCount = 0
         self.isDirty = true

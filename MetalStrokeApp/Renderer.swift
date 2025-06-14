@@ -32,13 +32,13 @@ class Rectangle {
         
         indexBufferTriangle = device.makeBuffer(
             bytes: indicesTriangle,
-            length: indicesTriangle.count * MemoryLayout<UInt16>.stride,
+            length: indicesTriangle.count * MemoryLayout<UInt16>.size,
             options: []
         )
         
         indexBufferWireframe = device.makeBuffer(
             bytes: indicesWireframe,
-            length: indicesWireframe.count * MemoryLayout<UInt16>.stride,
+            length: indicesWireframe.count * MemoryLayout<UInt16>.size,
             options: []
         )
     }
@@ -49,8 +49,10 @@ class Rectangle {
 class Renderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
     private let cmdQueue: MTLCommandQueue
-    private var pipelineState: MTLRenderPipelineState?
     
+    private var mainPipeline: MTLRenderPipelineState?
+    private var debugPipeline: MTLRenderPipelineState?
+
     private var tLastDraw: CFTimeInterval = CACurrentMediaTime()
     @Published private(set) var fps: Double = 0
     
@@ -59,7 +61,8 @@ class Renderer: NSObject, MTKViewDelegate {
     
     private var drawModeWireBuffer: MTLBuffer?
     private var drawModeFillBuffer: MTLBuffer?
-    
+    private var drawModeCenterBuffer: MTLBuffer?
+
     // Stroke Attributes
     private var showWireFrame: Bool = true
     
@@ -77,24 +80,37 @@ class Renderer: NSObject, MTKViewDelegate {
         // init super after self member initialization
         super.init()
         
-        buildPipeline()
+        self.mainPipeline =  buildPipeline(vertfunc: "vtx_main", fragfunc: "frag_main")
+        self.debugPipeline =  buildPipeline(vertfunc: "vtx_debug", fragfunc: "frag_main")
         rect.createBuffers(device)
         
-        drawModeFillBuffer = device.makeBuffer(bytes:[UInt32(0)], length: MemoryLayout<UInt32>.size, options: [])
-        drawModeWireBuffer = device.makeBuffer(bytes:[UInt32(1)], length: MemoryLayout<UInt32>.size, options: [])
+        drawModeFillBuffer = device.makeBuffer(bytes:[UInt32(0)], length: MemoryLayout<UInt32>.size)
+        drawModeWireBuffer = device.makeBuffer(bytes:[UInt32(1)], length: MemoryLayout<UInt32>.size)
+        drawModeCenterBuffer = device.makeBuffer(bytes:[UInt32(2)], length: MemoryLayout<UInt32>.size)
     }
     
-    private func buildPipeline() {
+    private func buildPipeline(vertfunc: String, fragfunc: String) -> MTLRenderPipelineState {
         let desc = MTLRenderPipelineDescriptor()
         let library = device.makeDefaultLibrary()
         
-        desc.vertexFunction = library?.makeFunction(name: "vtx_main")
-        desc.fragmentFunction = library?.makeFunction(name: "frag_main")
-        desc.colorAttachments[0].pixelFormat = MTLPixelFormat.bgra8Unorm
+        desc.vertexFunction = library?.makeFunction(name: vertfunc)
+        desc.fragmentFunction = library?.makeFunction(name: fragfunc)
         desc.vertexDescriptor = bufferManager.getVertexDescriptor()
         
+        // enable alpha blending
+        if let colorDesc = desc.colorAttachments[0] {
+            colorDesc.pixelFormat = MTLPixelFormat.bgra8Unorm
+            colorDesc.isBlendingEnabled = true
+            colorDesc.rgbBlendOperation = .add
+            colorDesc.alphaBlendOperation = .add
+            colorDesc.sourceRGBBlendFactor = .sourceAlpha
+            colorDesc.sourceAlphaBlendFactor = .sourceAlpha
+            colorDesc.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            colorDesc.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        }
+
         do {
-            pipelineState = try device.makeRenderPipelineState(descriptor: desc)
+            return try device.makeRenderPipelineState(descriptor: desc)
         } catch {
             fatalError("Failed to create pipeline state: \(error)")
         }
@@ -120,7 +136,7 @@ class Renderer: NSObject, MTKViewDelegate {
               let descriptor = view.currentRenderPassDescriptor,
               let cmdBuffer = cmdQueue.makeCommandBuffer(),
               let encoder = cmdBuffer.makeRenderCommandEncoder(descriptor: descriptor),
-              let pipelineState = pipelineState
+              let pipelineState = mainPipeline
         else {return}
         
         defer {
@@ -161,6 +177,39 @@ class Renderer: NSObject, MTKViewDelegate {
                     indexBufferOffset: 0,
                     instanceCount: bufferManager.vertexCount - 1
                 )
+                
+                // draw center line (not working)
+                if let pipeline = debugPipeline,
+                   let idxbuffer = bufferManager.centerLineIndexBuffer {
+                    
+                    encoder.setRenderPipelineState(pipeline)
+                    
+                    var pointStep:UInt32 = 0
+                    encoder.setVertexBytes(&pointStep, length: MemoryLayout<UInt32>.size, index: 3)
+                    
+                    encoder.drawIndexedPrimitives(
+                        type: .line,
+                        indexCount: bufferManager.centerLineIndexCount,
+                        indexType: .uint16,
+                        indexBuffer: idxbuffer,
+                        indexBufferOffset: 0
+                    )
+                    
+                    encoder.setVertexBytes(&pointStep, length: MemoryLayout<UInt32>.size, index: 3)
+                    encoder.drawPrimitives(
+                        type: .point,
+                        vertexStart: 0,
+                        vertexCount: bufferManager.vertexCount
+                    )
+                    
+                    pointStep = 1
+                    encoder.setVertexBytes(&pointStep, length: MemoryLayout<UInt32>.size, index: 3)
+                    encoder.drawPrimitives(
+                        type: .point,
+                        vertexStart: 0,
+                        vertexCount: bufferManager.vertexCount
+                    )
+                }
             }
         }
     }

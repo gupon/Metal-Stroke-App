@@ -4,9 +4,9 @@ import MetalKit
 struct ContentView: View {
     @StateObject var data = StrokeBufferManager()
     
-    @State private var strokeWidth:Float = 1.0
-    @State private var showWireFrame:Bool = false
-    
+    @State private var strokeWidth:Float = 2.0
+    @State private var showWireFrame:Bool = true
+
     var body: some View {
         VStack {
             ZStack(alignment: .topLeading) {
@@ -32,7 +32,7 @@ struct ContentView: View {
                 .frame(width: 240)
                 .padding()
                 
-                Text("Width: \(strokeWidth, specifier: "%.1f")")
+                Text("Width Scale: \(strokeWidth, specifier: "%.1f")")
                     .font(.custom("Monaco", size: 14))
                 
                 Spacer()
