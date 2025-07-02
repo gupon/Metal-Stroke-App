@@ -2,7 +2,7 @@ import SwiftUI
 import MetalKit
 
 struct ContentView: View {
-    @StateObject var data = StrokeBufferManager()
+    @StateObject var strokeModel = StrokeModel()
     
     @State private var strokeWidth:Float = 2.0
     @State private var showWireFrame:Bool = true
@@ -14,7 +14,7 @@ struct ContentView: View {
                     strokeWidth: $strokeWidth,
                     showWireFrame: $showWireFrame
                 )
-                    .environmentObject(data)
+                    .environmentObject(strokeModel)
 //                  .frame(minWidth: 640, minHeight: 640)
 
                 /*

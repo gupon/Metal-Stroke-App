@@ -9,6 +9,10 @@ struct StrokeVertex {
     float4 color;
     float radius;
     float end;
+    uchar capType;
+    uchar joinType;
+    uchar reserved0;
+    uchar reserved1;
 };
 
 struct VtxOut {

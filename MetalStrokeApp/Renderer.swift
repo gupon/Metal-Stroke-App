@@ -1,51 +1,5 @@
 import MetalKit
 
-class Rectangle {
-    public var vertexBuffer:MTLBuffer?
-    public var indexBufferTriangle:MTLBuffer?
-    public var indexBufferWireframe:MTLBuffer?
-    
-    let vertices: [SIMD2<Float>] = [
-        [-0.5, 0.0], [0.5, 0.0],
-        [0.5, 1.0], [-0.5, 1.0]
-    ]
-    
-    let indicesTriangle: [UInt16] = [
-        0, 1, 2,
-        0, 2, 3
-    ]
-    
-    let indicesWireframe: [UInt16] = [
-        0, 1,
-        1, 2,
-        2, 3,
-        3, 0,
-        0, 2
-    ]
-    
-    public func createBuffers(_ device:MTLDevice) {
-        vertexBuffer = device.makeBuffer(
-            bytes: vertices,
-            length: vertices.count * MemoryLayout<SIMD2<Float>>.stride,
-            options: []
-        )
-        
-        indexBufferTriangle = device.makeBuffer(
-            bytes: indicesTriangle,
-            length: indicesTriangle.count * MemoryLayout<UInt16>.size,
-            options: []
-        )
-        
-        indexBufferWireframe = device.makeBuffer(
-            bytes: indicesWireframe,
-            length: indicesWireframe.count * MemoryLayout<UInt16>.size,
-            options: []
-        )
-    }
-}
-
-
-
 class Renderer: NSObject, MTKViewDelegate {
     let device: MTLDevice
     private let cmdQueue: MTLCommandQueue
@@ -56,7 +10,9 @@ class Renderer: NSObject, MTKViewDelegate {
     private var tLastDraw: CFTimeInterval = CACurrentMediaTime()
     @Published private(set) var fps: Double = 0
     
-    private var bufferManager: StrokeBufferManager
+    private var buffer: StrokeBuffer
+    private var model: StrokeModel
+    
     private var rect: Rectangle
     
     private var drawModeWireBuffer: MTLBuffer?
@@ -66,14 +22,16 @@ class Renderer: NSObject, MTKViewDelegate {
     // Stroke Attributes
     private var showWireFrame: Bool = true
     
-    init(_ bufferManager: StrokeBufferManager) {
+    init(_ model: StrokeModel) {
         guard let device = MTLCreateSystemDefaultDevice(),
               let cmdQueue = device.makeCommandQueue() else {
             fatalError("Metal device or command queue creation failed")
         }
         self.device = device
         self.cmdQueue = cmdQueue
-        self.bufferManager = bufferManager
+        self.model = model
+        
+        self.buffer = StrokeBuffer()
         
         self.rect = Rectangle()
         
@@ -95,7 +53,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         desc.vertexFunction = library?.makeFunction(name: vertfunc)
         desc.fragmentFunction = library?.makeFunction(name: fragfunc)
-        desc.vertexDescriptor = bufferManager.getVertexDescriptor()
+        desc.vertexDescriptor = buffer.getVertexDescriptor()
         
         // enable alpha blending
         if let colorDesc = desc.colorAttachments[0] {
@@ -130,7 +88,7 @@ class Renderer: NSObject, MTKViewDelegate {
     
     func draw(in view: MTKView) {
         updateFPS()
-        bufferManager.updateBuffer(device: device)
+        buffer.updateBuffer(from: self.model, device: device)
         
         guard let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
@@ -148,7 +106,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         encoder.setRenderPipelineState(pipelineState)
         
-        if let vbuffer = bufferManager.getVertexBuffer()
+        if let vbuffer = buffer.getVertexBuffer()
         {
             
             encoder.setVertexBuffer(vbuffer, offset: 0, index: 0)
@@ -162,7 +120,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 indexType: .uint16,
                 indexBuffer: rect.indexBufferTriangle!,
                 indexBufferOffset: 0,
-                instanceCount: bufferManager.vertexCount - 1
+                instanceCount: buffer.vertexCount - 1
             )
             
             if (showWireFrame)
@@ -175,12 +133,12 @@ class Renderer: NSObject, MTKViewDelegate {
                     indexType: .uint16,
                     indexBuffer: rect.indexBufferWireframe!,
                     indexBufferOffset: 0,
-                    instanceCount: bufferManager.vertexCount - 1
+                    instanceCount: buffer.vertexCount - 1
                 )
                 
                 // draw center line (not working)
                 if let pipeline = debugPipeline,
-                   let idxbuffer = bufferManager.centerLineIndexBuffer {
+                   let idxbuffer = buffer.centerLineIndexBuffer {
                     
                     encoder.setRenderPipelineState(pipeline)
                     
@@ -189,7 +147,7 @@ class Renderer: NSObject, MTKViewDelegate {
                     
                     encoder.drawIndexedPrimitives(
                         type: .line,
-                        indexCount: bufferManager.centerLineIndexCount,
+                        indexCount: buffer.centerLineIndexCount,
                         indexType: .uint16,
                         indexBuffer: idxbuffer,
                         indexBufferOffset: 0
@@ -199,7 +157,7 @@ class Renderer: NSObject, MTKViewDelegate {
                     encoder.drawPrimitives(
                         type: .point,
                         vertexStart: 0,
-                        vertexCount: bufferManager.vertexCount
+                        vertexCount: buffer.vertexCount
                     )
                     
                     pointStep = 1
@@ -207,7 +165,7 @@ class Renderer: NSObject, MTKViewDelegate {
                     encoder.drawPrimitives(
                         type: .point,
                         vertexStart: 0,
-                        vertexCount: bufferManager.vertexCount
+                        vertexCount: buffer.vertexCount
                     )
                 }
             }

@@ -5,28 +5,27 @@ import MetalKit
  Bridge for SwiftUI <-> AppKit
  
  MetalView: SwiftUI(NSViewRepresentable)
- MyMTKView: AppKit(NSView)
- 
+ InteractiveMTKView: AppKit(NSView)
 */
 
 struct MetalView: NSViewRepresentable {
-    @EnvironmentObject var data: StrokeBufferManager
+    @EnvironmentObject var strokeModel: StrokeModel
     
     // draw properties from contentView
     @Binding var strokeWidth: Float
     @Binding var showWireFrame: Bool
     
     func makeCoordinator() -> Renderer {
-        Renderer(data)
+        Renderer(strokeModel)
     }
     
     func updateNSView(_ nsView: MTKView, context: Context) {
-        data.setStrokeWidthScale(strokeWidth)
+        strokeModel.setStrokeWidthScale(strokeWidth)
         context.coordinator.setWireframe(showWireFrame)
     }
     
     func makeNSView(context: Context) -> MTKView {
-        let view = InteractiveMTKView(frame:NSRect.zero , device: context.coordinator.device, data: self.data)
+        let view = InteractiveMTKView(frame:NSRect.zero , device: context.coordinator.device, data: self.strokeModel)
         view.clearColor = MTLClearColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
         view.delegate = context.coordinator
         view.renderer = context.coordinator
@@ -47,22 +46,24 @@ struct MetalView: NSViewRepresentable {
 class InteractiveMTKView: MTKView {
     weak var renderer: Renderer?
     
-    private var points:[SIMD2<Float>] = []
-    private var data: StrokeBufferManager
+    private var strokeModel: StrokeModel
     
     private var baseHue: CGFloat = 0.5
     private var minRadius: Float = 0.015
     private var dragStartPos: SIMD2<Float>?
     
-    init(frame frameRect: CGRect, device: (any MTLDevice)?, data:StrokeBufferManager) {
-        self.data = data
+    init(frame frameRect: CGRect, device: (any MTLDevice)?, data:StrokeModel) {
+        self.strokeModel = data
         super.init(frame: frameRect, device: device)
     }
     
     required init(coder: NSCoder) {
-        self.data = StrokeBufferManager()
+        self.strokeModel = StrokeModel()
         super.init(coder: coder)
     }
+    
+    
+    /* Mouse Events */
     
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
@@ -75,7 +76,7 @@ class InteractiveMTKView: MTKView {
         
         let pos = toMetalPos(event.locationInWindow)
         
-        data.addPoint(
+        strokeModel.addPoint(
             pos: pos,
             color: colorToSIMD4(color),
             radius: minRadius
@@ -90,13 +91,13 @@ class InteractiveMTKView: MTKView {
         if let startPos = dragStartPos {
             let localPos = toMetalPos(event.locationInWindow)
             let dist = simd_length(localPos - startPos)
-            data.setFinalRadius(max(dist, minRadius))
+            strokeModel.setFinalRadius(max(dist, minRadius))
         }
     }
     
     override func rightMouseDown(with event: NSEvent) {
         super.rightMouseDown(with: event)
-        data.clearAll()
+        strokeModel.clearAll()
     }
     
     override func mouseUp(with event: NSEvent) {
@@ -106,17 +107,23 @@ class InteractiveMTKView: MTKView {
         dragStartPos = nil
     }
     
+    
+    /* Keyboard Events */
+    
     override var acceptsFirstResponder: Bool { true }
     
     override func keyDown(with event: NSEvent) {
         super.keyDown(with: event)
         print(event.keyCode)
         if event.keyCode == 36 {
-            data.endStroke()
+            strokeModel.endStroke()
         }
         
         baseHue = CGFloat.random(in: 0...1)
     }
+    
+    
+    /* Helper Funcs */
     
     override func viewDidMoveToWindow() {
         self.window?.makeFirstResponder(self)
