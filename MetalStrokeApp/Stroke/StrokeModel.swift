@@ -28,11 +28,10 @@ class StrokeModel: ObservableObject {
     
     
     @Published var strokes:[Stroke] = []
-    public var totalVertexCount: Int = 0
+    private var currentStroke: Stroke?
+    
     public var isDirty: Bool = false
     public var strokeWidthScale: Float = 1
-
-    private var currentStroke: Stroke?
     
     
     enum CapType: UInt8 {
@@ -45,6 +44,7 @@ class StrokeModel: ObservableObject {
     
     public func markEndVertices() {
         var end: Float = 0
+        
         strokes.forEach() { stroke in
             if stroke.vertices.count > 1 {
                 for i in 0 ..< stroke.vertices.count {
@@ -57,6 +57,11 @@ class StrokeModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    public func getFlatVertexList(keepSinglePointStroke: Bool = false) -> [Vertex] {
+        let targetStrokes = keepSinglePointStroke ? strokes : strokes.filter{ $0.vertices.count > 1 }
+        return targetStrokes.flatMap{ $0.vertices }
     }
     
     
@@ -117,7 +122,6 @@ class StrokeModel: ObservableObject {
     func clearAll() {
         strokes.removeAll()
         currentStroke = nil
-        totalVertexCount = 0
         self.isDirty = true
     }
 }

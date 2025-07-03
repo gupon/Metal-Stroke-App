@@ -21,9 +21,24 @@ struct VtxOut {
     float ptsize [[point_size]] = 6.0;
 };
 
-float2 rotate(float2 pos, float angle) {
-    return float2(pos.x * cos(angle) - pos.y * sin(angle),
-                  pos.x * sin(angle) + pos.y * cos(angle));
+float2x2 rotateSkewMat(float angle, bool skew=false) {
+    float s = sin(angle);
+    float c = cos(angle);
+    float sx = skew ? 1.0 / abs(c) : 1.0;
+    return float2x2(c * sx, -s, s * sx, c);
+}
+
+float wrap_angle_PIH(float angle) {
+    if (abs(angle) > PIH) {
+        angle -= sign(angle) * PI;
+    }
+    return angle;
+}
+
+float calcMiterEndAngle (float angleA, float2 dirB) {
+    float angleB = atan2(dirB.y, dirB.x);
+    float mid_angle = (angleA + angleB) * 0.5;
+    return wrap_angle_PIH(mid_angle - angleA);
 }
 
 
@@ -71,49 +86,30 @@ vertex VtxOut vtx_main(
         out.pos = float4(v0.pos, 0, 1);
         return out;
     }
-
-    float2 dp = v1.pos - v0.pos;
-    float sy = length(dp);
-    float angle = atan2(dp.y, dp.x) - PIH;
     
     // coordinate in rect
     float2 localpos = rectPos[vid];
+
+    float2 dp = v1.pos - v0.pos;
+    float angleA = atan2(dp.y, dp.x);
     
-    StrokeVertex v2;
-    uint rotend = 0;
-    if (localpos.y < 0.5 && v0.end == 0) {
-        v2 = vertices[iid - 1];
-        dp = v0.pos - v2.pos;
-        rotend = 1;
-    } else if (localpos.y > 0.5 && v1.end == 0){
-        v2 = vertices[iid + 2];
-        dp = v2.pos - v1.pos;
-        rotend = 1;
-    }
-    
-    float angleB = atan2(dp.y, dp.x) - PIH;
-    angleB = (angle + angleB) * 0.5;
-    
-    float dangle = angle - angleB;
-    if (abs(dangle) > PIH) {
-        angleB += -sign(angleB) * PI;
-        dangle = angle - angleB;
-    }
-    
-    // pos(x only)
+    // position: set x first
     float2 pos = float2(mix(v0.radius, v1.radius, localpos.y) * localpos.x * 2, 0);
     
-    // rotate ends first
-    if (rotend) {
-        pos *= 1. / cos(abs(dangle));
+    bool isMidStart = localpos.y < 0.5 && v0.end == 0;
+    bool isMidEnd = localpos.y > 0.5 && v1.end == 0;
+    
+    if (0 && (isMidStart || isMidEnd)) {
+        // rotate end for midpoints
+        float ends_angle = 0;
+        float2 dirB = isMidStart ? (v0.pos - vertices[iid-1].pos) : (vertices[iid+2].pos - v1.pos);
+        ends_angle = calcMiterEndAngle(angleA, dirB);
+        pos *= rotateSkewMat(ends_angle, true);
     }
-    pos = rotate(pos, rotend ? angleB : angle);
     
-    // add y component
-    pos += rotate(float2(0, localpos.y * sy), angle);
-    
-    // translate by start pos
-    pos += v0.pos;
+    pos += float2(0, localpos.y) * distance(v0.pos, v1.pos);      // add y
+    pos *= rotateSkewMat(angleA - PIH);     // rotate
+    pos += v0.pos;                          // add base pos
     
     // form out
     out.pos = float4(pos, 0, 1);
@@ -132,6 +128,5 @@ vertex VtxOut vtx_main(
 }
 
 fragment float4 frag_main(VtxOut in [[stage_in]]) {
-//    return float4(1.0, 0.2, 0.8, 1.0);
     return in.color;
 }

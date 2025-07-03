@@ -88,7 +88,9 @@ class Renderer: NSObject, MTKViewDelegate {
     
     func draw(in view: MTKView) {
         updateFPS()
-        buffer.updateBuffer(from: self.model, device: device)
+        
+        model.markEndVertices()
+        buffer.updateBuffer(from: model, device: device)
         
         guard let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
@@ -106,7 +108,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         encoder.setRenderPipelineState(pipelineState)
         
-        if let vbuffer = buffer.getVertexBuffer()
+        if let vbuffer = buffer.getLatest()
         {
             
             encoder.setVertexBuffer(vbuffer, offset: 0, index: 0)
@@ -145,6 +147,7 @@ class Renderer: NSObject, MTKViewDelegate {
                     var pointStep:UInt32 = 0
                     encoder.setVertexBytes(&pointStep, length: MemoryLayout<UInt32>.size, index: 3)
                     
+                    // draw center line
                     encoder.drawIndexedPrimitives(
                         type: .line,
                         indexCount: buffer.centerLineIndexCount,
@@ -153,6 +156,8 @@ class Renderer: NSObject, MTKViewDelegate {
                         indexBufferOffset: 0
                     )
                     
+                    
+                    // draw points
                     encoder.setVertexBytes(&pointStep, length: MemoryLayout<UInt32>.size, index: 3)
                     encoder.drawPrimitives(
                         type: .point,

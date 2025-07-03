@@ -5,10 +5,11 @@ class StrokeBuffer {
     static let VTX_EMPTY = StrokeModel.Vertex()
     
     // current buffer state
-    private(set) var vertexCount: Int = 0
     private let BFFR_CHNK_SIZE: Int = 300
     private var currChunkNum: Int = 0
-    private var vertexBuffer: MTLBuffer?
+    
+    private(set) var vertexBuffer: MTLBuffer?
+    private(set) var vertexCount:Int = 0
     
     private(set) var centerLineIndexCount = 0
     private(set) var centerLineIndexBuffer:MTLBuffer?
@@ -52,10 +53,13 @@ class StrokeBuffer {
     public func updateBuffer(from model:StrokeModel, device: MTLDevice) {
         guard model.isDirty else { return }
         
-        model.markEndVertices()
+        let allVertices = model.getFlatVertexList()
+        let newVertexNum = allVertices.count
         
-        let allVertices = model.strokes.flatMap{ $0.vertices }
-        let newVertexNum = model.strokes.reduce(0){ $0 + $1.vertices.count }
+        guard newVertexNum > 1 else {
+            self.vertexCount = 0
+            return
+        }
         
         let newChunkNum = (newVertexNum + BFFR_CHNK_SIZE - 1) / BFFR_CHNK_SIZE
         let newCapacity = newChunkNum * BFFR_CHNK_SIZE
@@ -82,7 +86,7 @@ class StrokeBuffer {
         
         updateCenterIndexBuffer(from:model.strokes, device: device)
         
-        vertexCount = newVertexNum
+        self.vertexCount = newVertexNum
         model.isDirty = false
     }
     
@@ -109,9 +113,7 @@ class StrokeBuffer {
             .makeBuffer( bytes: indices, length: indices.count * MemoryLayout<UInt16>.size )
     }
     
-    func getVertexBuffer() -> MTLBuffer? {
-        return vertexCount > 1 ? vertexBuffer : nil
+    func getLatest() -> MTLBuffer? {
+        vertexCount > 1 ? vertexBuffer : nil
     }
-    
-    
 }

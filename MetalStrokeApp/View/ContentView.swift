@@ -4,7 +4,7 @@ import MetalKit
 struct ContentView: View {
     @StateObject var strokeModel = StrokeModel()
     
-    @State private var strokeWidth:Float = 2.0
+    @State private var strokeWidth:Float = 4.0
     @State private var showWireFrame:Bool = true
 
     var body: some View {
