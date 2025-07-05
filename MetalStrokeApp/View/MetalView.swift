@@ -10,18 +10,17 @@ import MetalKit
 
 struct MetalView: NSViewRepresentable {
     @EnvironmentObject var strokeModel: StrokeModel
+    @EnvironmentObject var renderOptions: RenderOptions
     
     // draw properties from contentView
     @Binding var strokeWidth: Float
-    @Binding var showWireFrame: Bool
     
     func makeCoordinator() -> Renderer {
-        Renderer(strokeModel)
+        Renderer(strokeModel, options: renderOptions)
     }
     
     func updateNSView(_ nsView: MTKView, context: Context) {
         strokeModel.setStrokeWidthScale(strokeWidth)
-        context.coordinator.setWireframe(showWireFrame)
     }
     
     func makeNSView(context: Context) -> MTKView {
@@ -71,6 +70,9 @@ class InteractiveMTKView: MTKView {
         var hue = CGFloat.random(in: 0...0.2) + baseHue
         hue = hue.truncatingRemainder(dividingBy: 1.0)
         
+        let br = CGFloat.random(in: 0...1);
+
+//        let color = NSColor(hue: hue, saturation: 0.75, brightness: 0.75, alpha: 1.0)
         let color = NSColor(hue: hue, saturation: 0.75, brightness: 0.75, alpha: 1.0)
             .usingColorSpace(.deviceRGB)!
         
@@ -88,11 +90,13 @@ class InteractiveMTKView: MTKView {
     override func mouseDragged(with event: NSEvent) {
         super.mouseDragged(with: event)
         
+        /*
         if let startPos = dragStartPos {
             let localPos = toMetalPos(event.locationInWindow)
             let dist = simd_length(localPos - startPos)
             strokeModel.setFinalRadius(max(dist, minRadius))
         }
+        */
     }
     
     override func rightMouseDown(with event: NSEvent) {

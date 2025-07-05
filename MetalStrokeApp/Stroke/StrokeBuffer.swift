@@ -9,7 +9,13 @@ class StrokeBuffer {
     private var currChunkNum: Int = 0
     
     private(set) var vertexBuffer: MTLBuffer?
+    private(set) var joinIndexBuffer: MTLBuffer?
+    private(set) var capIndexBuffer: MTLBuffer?
+
     private(set) var vertexCount:Int = 0
+    private(set) var joinCount:Int = 0
+    private(set) var capCount:Int = 0
+
     
     private(set) var centerLineIndexCount = 0
     private(set) var centerLineIndexBuffer:MTLBuffer?
@@ -43,6 +49,18 @@ class StrokeBuffer {
         desc.attributes[3].bufferIndex = 0
         offset += MemoryLayout<Float>.stride
         
+        // --capType (UInt8)
+        desc.attributes[4].format = .uchar
+        desc.attributes[4].offset = offset
+        desc.attributes[4].bufferIndex = 0
+        offset += MemoryLayout<UInt8>.stride
+        
+        // --end (Float)
+        desc.attributes[5].format = .uchar
+        desc.attributes[5].offset = offset
+        desc.attributes[5].bufferIndex = 0
+        offset += MemoryLayout<UInt8>.stride
+
         desc.layouts[0].stride = StrokeBuffer.VTX_STRIDE
         
         return desc;
@@ -64,6 +82,9 @@ class StrokeBuffer {
         let newChunkNum = (newVertexNum + BFFR_CHNK_SIZE - 1) / BFFR_CHNK_SIZE
         let newCapacity = newChunkNum * BFFR_CHNK_SIZE
         
+        var joinIndices: [Int] = []
+        var capIndices: [Int] = []
+
         // expand buffer if necesarry
         if currChunkNum < newChunkNum {
             vertexBuffer = device.makeBuffer(length: newCapacity * StrokeBuffer.VTX_STRIDE)
@@ -76,6 +97,14 @@ class StrokeBuffer {
             for (i, vertex) in allVertices.enumerated() {
                 ptr[i] = vertex
                 ptr[i].radius *= model.strokeWidthScale
+                
+                if vertex.end == 0 && vertex.joinType != .miter {
+                    joinIndices.append(i)
+                }
+                
+                if vertex.end != 0 && vertex.capType != .butt {
+                    capIndices.append(i)
+                }
             }
             
             (ptr + newVertexNum).initialize(
@@ -84,6 +113,23 @@ class StrokeBuffer {
             )
         }
         
+        self.joinCount = joinIndices.count
+        self.capCount = capIndices.count
+
+        if !joinIndices.isEmpty {
+            self.joinIndexBuffer = device.makeBuffer(
+                bytes: joinIndices.map{UInt16($0)},
+                length: MemoryLayout<UInt16>.size * joinIndices.count
+            )
+        }
+        
+        if !capIndices.isEmpty {
+            self.capIndexBuffer = device.makeBuffer(
+                bytes: capIndices.map{UInt16($0)},
+                length: MemoryLayout<UInt16>.size * capIndices.count
+            )
+        }
+
         updateCenterIndexBuffer(from:model.strokes, device: device)
         
         self.vertexCount = newVertexNum
@@ -113,7 +159,15 @@ class StrokeBuffer {
             .makeBuffer( bytes: indices, length: indices.count * MemoryLayout<UInt16>.size )
     }
     
-    func getLatest() -> MTLBuffer? {
+    func getVertexBuffer() -> MTLBuffer? {
         vertexCount > 1 ? vertexBuffer : nil
+    }
+    
+    func getJoinIndexBuffer() -> MTLBuffer? {
+        joinCount > 0 ? joinIndexBuffer : nil
+    }
+    
+    func getCapIndexBuffer() -> MTLBuffer? {
+        capCount > 0 ? capIndexBuffer : nil
     }
 }

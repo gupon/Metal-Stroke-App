@@ -3,18 +3,16 @@ import MetalKit
 
 struct ContentView: View {
     @StateObject var strokeModel = StrokeModel()
+    @StateObject var renderOptions = RenderOptions()
     
-    @State private var strokeWidth:Float = 4.0
-    @State private var showWireFrame:Bool = true
+    @State private var strokeWidth:Float = 15.0
 
     var body: some View {
         VStack {
             ZStack(alignment: .topLeading) {
-                MetalView(
-                    strokeWidth: $strokeWidth,
-                    showWireFrame: $showWireFrame
-                )
+                MetalView(strokeWidth: $strokeWidth)
                     .environmentObject(strokeModel)
+                    .environmentObject(renderOptions)
 //                  .frame(minWidth: 640, minHeight: 640)
 
                 /*
@@ -23,13 +21,14 @@ struct ContentView: View {
                     .padding()
                  */
             }
+            .padding(.bottom, 16)
             
             HStack {
                 Slider(
                     value: $strokeWidth,
-                    in: 0...5
+                    in: 0 ... 20
                 )
-                .frame(width: 240)
+                .frame(width: 180)
                 .padding()
                 
                 Text("Width Scale: \(strokeWidth, specifier: "%.1f")")
@@ -37,8 +36,13 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                Toggle("Wireframe", isOn: $showWireFrame)
-                    .padding()
+                VStack (alignment: .leading) {
+                    Toggle("Wireframe", isOn: $renderOptions.wireFrame)
+//                    Toggle("Debug", isOn: $renderOptions.debug)
+                    Toggle("Extend Join", isOn: $renderOptions.roundMode)
+                    Toggle("Interpolate Color", isOn: $renderOptions.colorInterp)
+                }
+                .padding(.trailing, 16)
             }
         }
     }
