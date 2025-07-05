@@ -5,7 +5,7 @@ struct ContentView: View {
     @StateObject var strokeModel = StrokeModel()
     @StateObject var renderOptions = RenderOptions()
     
-    @State private var strokeWidth:Float = 15.0
+    @State private var strokeWidth:Float = 4.0
 
     var body: some View {
         VStack {
@@ -38,9 +38,7 @@ struct ContentView: View {
                 
                 VStack (alignment: .leading) {
                     Toggle("Wireframe", isOn: $renderOptions.wireFrame)
-//                    Toggle("Debug", isOn: $renderOptions.debug)
-                    Toggle("Extend Join", isOn: $renderOptions.roundMode)
-                    Toggle("Interpolate Color", isOn: $renderOptions.colorInterp)
+                    Toggle("Debug", isOn: $renderOptions.debug)
                 }
                 .padding(.trailing, 16)
             }

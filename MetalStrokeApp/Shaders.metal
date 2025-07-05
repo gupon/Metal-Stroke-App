@@ -14,8 +14,6 @@ using namespace metal;
 #define BUFID_DRAWMODE 9
 #define BUFID_POINTSTEP 10
 #define BUFID_DEBUG 20
-#define BUFID_ROUNDMODE 21
-#define BUFID_COLINTERP 22
 
 struct StrokeVertex {
     packed_float2 pos;
@@ -41,15 +39,9 @@ float2x2 rotateSkewMat(float angle, bool skew=false) {
     return float2x2(c * sx, -s, s * sx, c);
 }
 
-float wrap_angle_PIH(float angle) {
-    if (abs(angle) > PIH)
-        angle -= sign(angle) * PI;
-    return angle;
-}
-
-float wrap_angle_PI(float angle) {
-    if (abs(angle) > PI)
-        angle -= sign(angle) * PI * 2;
+float wrap_angle(float angle, float segment=PI) {
+    if (abs(angle) > segment)
+        angle -= sign(angle) * segment * 2.0;
     return angle;
 }
 
@@ -59,7 +51,7 @@ float vectorAngle (float2 a, float2 b) {
 }
 
 float miterAngle (float a, float b) {
-    return wrap_angle_PIH((a + b) * 0.5 - a);
+    return wrap_angle((a + b) * 0.5 - a, PIH);
 }
 
 float fit (float value, float from_min, float from_max, float to_min, float to_max) {
@@ -110,8 +102,6 @@ vertex VtxOut vert_main (
     const device StrokeVertex* vertices[[buffer(BUFID_VERTEX)]],
     const device float2* rectPos[[buffer(BUFID_RECT)]],
     constant uchar& drawMode [[buffer(BUFID_DRAWMODE)]],
-    constant uchar& roundMode [[buffer(BUFID_ROUNDMODE)]],
-    constant uchar& colorInterp [[buffer(BUFID_COLINTERP)]],
     uint vid [[vertex_id]],
     uint iid [[instance_id]]
 ) {
@@ -134,43 +124,20 @@ vertex VtxOut vert_main (
     bool isMidEnd = localpos.y > 0.5 && v1.end == 0;
     
     // miter ends
-    float4 color = float4(-1);
-    if (roundMode && (isMidStart || isMidEnd)) {
-        float angleB = vectorAngle(isMidStart ? v0.pos : v1.pos,
-                                   isMidStart ? vertices[iid - 1].pos : vertices[iid + 2].pos);
-        
-        if (isMidStart) angleB -= PI * sign(angleB);    // flip angle in PI range
-        
-        bool isClockwise = wrap_angle_PI(angleB - angleA) < 0;
-        if (isMidStart) isClockwise = !isClockwise;
-        
-        bool isRightSide = localpos.x > 0;
-        bool isInnerSide = isRightSide == isClockwise;
-        
-        float angleM = miterAngle(angleA, angleB);
-
-        if (isInnerSide) {
-            pos *= rotateSkewMat(angleM, true);
-        } else if (colorInterp) {
-            if (isMidStart)
-                color = calcJoinColor(v0, vertices[iid-1], v1, angleM, 1.0);
-            else
-                color = calcJoinColor(v1, v0, vertices[iid+2], angleM, 0.0);
-        }
-    }
-    
-    
-    /*
     if (isMidStart || isMidEnd) {
         float angleB = vectorAngle(isMidStart ? v0.pos : v1.pos,
                                    isMidStart ? vertices[iid - 1].pos : vertices[iid + 2].pos);
+        if (isMidStart) angleB -= PI * sign(angleB);    // flip angle
         
-        if (isMidStart) angleB -= PI * sign(angleB);    // flip angle in PI range
-        float ends_angle = wrap_angle_PIH((angleA + angleB) * 0.5 - angleA);
-        pos *= rotateSkewMat(ends_angle, true);
+        bool isClockwise = wrap_angle((angleB - angleA) * (isMidStart ? -1 : 1)) < 0;
+        bool isInnerSide = (localpos.x > 0) == isClockwise;
+        
+        bool isMiter = (isMidStart && v0.joinType == 0) || (isMidEnd && v1.joinType == 0);
+        
+        if (isInnerSide || isMiter)
+            pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
     }
-     */
-
+    
     pos += float2(0, localpos.y) * distance(v0.pos, v1.pos);      // add y
     pos *= rotateSkewMat(angleA - PIH);     // rotate
     pos += v0.pos;                          // add base pos
@@ -181,10 +148,7 @@ vertex VtxOut vert_main (
     
     if (drawMode == 0) {
         // fill
-        if (color.r != -1)
-            out.color = color;
-        else
-            out.color = mix(v0.color, v1.color, localpos.y);
+        out.color = mix(v0.color, v1.color, localpos.y);
     } else if (drawMode == 1) {
         // wireframe
         out.color = float4(1,1,1,0.5);
@@ -203,8 +167,6 @@ vertex VtxOut vert_join (
      constant uchar& roundRes [[buffer(BUFID_ROUNDRES)]],
      constant uchar& drawMode [[buffer(BUFID_DRAWMODE)]],
      constant uchar& debug [[buffer(BUFID_DEBUG)]],
-     constant uchar& roundMode [[buffer(BUFID_ROUNDMODE)]],
-     constant uchar& colorInterp [[buffer(BUFID_COLINTERP)]],
      uint vid [[vertex_id]],
      uint iid [[instance_id]]
 ) {
@@ -219,49 +181,34 @@ vertex VtxOut vert_join (
     
     float angleA = vectorAngle(vA.pos, v0.pos);
     float angleB = vectorAngle(v0.pos, vB.pos);
-    float idx_ratio = (vid - 1.0) / roundRes;
-    
-    // used by origin point only
-    float angleM = miterAngle(angleA, angleB);
 
-    if (vid > 0) {
-        float dAngle = wrap_angle_PI(angleB - angleA);
+    if (vid == 0) {
+        bool isClockwise = wrap_angle(angleB - angleA) < 0;
         
+        pos = float2(1, 0) * v0.radius;
+        pos *= isClockwise ? 1 : -1;
+        
+        pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+        pos *= rotateSkewMat(angleA - PIH);
+    } else {
+        float dAngle = wrap_angle(angleB - angleA);
+        float idx_ratio = (vid - 1.0) / roundRes;
         float angle = dAngle * idx_ratio;
         
         pos = float2(cos(angle), sin(angle)) * v0.radius;
         pos *= sign(dAngle);
         pos *= rotateSkewMat(angleA - PIH);
-    } else {
-        if (roundMode) {
-            bool isClockwise = wrap_angle_PI(angleB - angleA) < 0;
-            
-            pos = float2(1, 0) * v0.radius;
-            pos *= isClockwise ? 1 : -1;
-            
-            pos *= rotateSkewMat(angleM, true);
-            pos *= rotateSkewMat(angleA - PIH);
-        }
     }
     
     pos += v0.pos;
-    
-    out.pos = float4(pos, 0, 1);
+    out.pos = float4(pos, idx * 0.01, 1);
     
     if (drawMode == 0) {
-        float4 color = v0.color;
-        
-        if (colorInterp)
-            color = calcJoinColor(v0, vA, vB, angleM, idx_ratio);
-        
-        if (vid == 0) color = v0.color;
-//        if (vid != 0 && idx_ratio == 0.) color = float4(1, 0, 0, 1);
-//        if (vid != 0 && idx_ratio == 1.) color = float4(0, 0, 1, 1);
-        out.color = debug ? float4(0.75, 0, 0, 1) : color;
+        // fill
+        out.color = debug ? float4(0.75, 0, 0, 1) : v0.color;
     } else {
         // wireframe
         out.color = float4(1,1,1,0.5);
-//        out.color = float4(1,0,0,1);
         out.pos.z += 0.1;
     }
 

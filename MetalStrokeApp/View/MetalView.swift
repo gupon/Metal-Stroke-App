@@ -70,9 +70,6 @@ class InteractiveMTKView: MTKView {
         var hue = CGFloat.random(in: 0...0.2) + baseHue
         hue = hue.truncatingRemainder(dividingBy: 1.0)
         
-        let br = CGFloat.random(in: 0...1);
-
-//        let color = NSColor(hue: hue, saturation: 0.75, brightness: 0.75, alpha: 1.0)
         let color = NSColor(hue: hue, saturation: 0.75, brightness: 0.75, alpha: 1.0)
             .usingColorSpace(.deviceRGB)!
         

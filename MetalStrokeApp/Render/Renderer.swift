@@ -4,8 +4,6 @@ class RenderOptions: ObservableObject {
     @Published var wireFrame: Bool = true
     @Published var debug: Bool = true
     @Published var showFPS: Bool = true
-    @Published var roundMode: Bool = false
-    @Published var colorInterp: Bool = false
 }
 
 class Renderer: NSObject, MTKViewDelegate {
@@ -34,6 +32,7 @@ class Renderer: NSObject, MTKViewDelegate {
               let cmdQueue = device.makeCommandQueue() else {
             fatalError("Metal device or command queue creation failed")
         }
+        
         self.device = device
         self.cmdQueue = cmdQueue
         self.model = model
@@ -46,7 +45,7 @@ class Renderer: NSObject, MTKViewDelegate {
         self.rectShape = Rectangle()
         rectShape.createBuffers(device)
         
-        self.roundShape = RoundShape(roundRes: 8)
+        self.roundShape = RoundShape(roundRes: 16)
         roundShape.createBuffers(device)
         
 
@@ -126,9 +125,7 @@ class Renderer: NSObject, MTKViewDelegate {
             encoder.setVertexBuffer(vbuffer, offset: 0, index: BufferIndex.mainVertex.rawValue)
             encoder.setVertexBuffer(rectShape.vertexBuffer, offset: 0, index: BufferIndex.rectShape.rawValue)
             
-            setVertexBytes(encoder: encoder, value: UInt8(options.wireFrame ? 1 : 0), index: BufferIndex.debug)
-            setVertexBytes(encoder: encoder, value: UInt8(options.roundMode ? 1 : 0), index: BufferIndex.roundMode)
-            setVertexBytes(encoder: encoder, value: UInt8(options.colorInterp ? 1 : 0), index: BufferIndex.colorInterp)
+            setVertexBytes(encoder: encoder, value: UInt8(options.debug ? 1 : 0), index: BufferIndex.debug)
 
             // draw stroke body
             setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.drawMode)
@@ -168,9 +165,7 @@ class Renderer: NSObject, MTKViewDelegate {
                 setVertexBytes(encoder: encoder, value: UInt8(roundShape.roundRes), index: BufferIndex.roundRes)
                 setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.drawMode)
 
-                setVertexBytes(encoder: encoder, value: UInt8(options.wireFrame ? 1 : 0), index: BufferIndex.debug)
-                setVertexBytes(encoder: encoder, value: UInt8(options.roundMode ? 1 : 0), index: BufferIndex.roundMode)
-                setVertexBytes(encoder: encoder, value: UInt8(options.colorInterp ? 1 : 0), index: BufferIndex.colorInterp)
+                setVertexBytes(encoder: encoder, value: UInt8(options.debug ? 1 : 0), index: BufferIndex.debug)
 
                 
                 encoder.drawIndexedPrimitives(
@@ -241,7 +236,5 @@ class Renderer: NSObject, MTKViewDelegate {
         case drawMode = 9
         case pointStep = 10
         case debug = 20
-        case roundMode = 21
-        case colorInterp = 22
     }
 }

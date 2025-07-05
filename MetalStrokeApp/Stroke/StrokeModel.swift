@@ -88,7 +88,8 @@ class StrokeModel: ObservableObject {
             let vert = Vertex(
                 position: pos,
                 color: color,
-                radius: radius
+                radius: radius,
+                joinType: [JoinType.miter, JoinType.round][Int.random(in: 0...1)]
             )
             stroke.vertices.append(vert)
             isDirty = true
