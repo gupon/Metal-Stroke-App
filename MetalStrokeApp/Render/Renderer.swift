@@ -26,7 +26,18 @@ class Renderer: NSObject, MTKViewDelegate {
     private var rectShape: Rectangle
     private var roundShape: RoundShape
     
-    
+    enum BufferIndex: Int {
+        case mainVertex = 0
+        case rectShape = 1
+        case roundShape = 2
+        case roundRes = 3
+        case joinIndex = 4
+        case capIndex = 5
+        case drawMode = 9
+        case pointStep = 10
+        case debug = 20
+    }
+
     init(_ model: StrokeModel, options: RenderOptions) {
         guard let device = MTLCreateSystemDefaultDevice(),
               let cmdQueue = device.makeCommandQueue() else {
@@ -47,7 +58,6 @@ class Renderer: NSObject, MTKViewDelegate {
         
         self.roundShape = RoundShape(roundRes: 16)
         roundShape.createBuffers(device)
-        
 
         // init super after self member initialization
         // but before member function call
@@ -57,7 +67,6 @@ class Renderer: NSObject, MTKViewDelegate {
         self.mainPipeline = buildPipeline(vertfunc: "vert_main", fragfunc: "frag_main", enableAlpha: true)
         self.joinPipeline = buildPipeline(vertfunc: "vert_join", fragfunc: "frag_main", enableAlpha: true)
         self.debugPipeline = buildPipeline(vertfunc: "vert_debug", fragfunc: "frag_main", enableAlpha: true)
-        
     }
     
     // build Render Pipeline from shader function names
@@ -129,28 +138,13 @@ class Renderer: NSObject, MTKViewDelegate {
 
             // draw stroke body
             setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.drawMode)
-            encoder.drawIndexedPrimitives(
-                type: .triangle,
-                indexCount: rectShape.indicesTriangle.count,
-                indexType: .uint16,
-                indexBuffer: rectShape.indexBufferTriangle!,
-                indexBufferOffset: 0,
-                instanceCount: buffer.vertexCount - 1
-            )
+            drawInstancedShapes(encoder: encoder, shape: rectShape, count: buffer.vertexCount-1)
             
             if options.wireFrame
             {
                 setVertexBytes(encoder: encoder, value: UInt8(1), index: BufferIndex.drawMode)
-                encoder.drawIndexedPrimitives(
-                    type: .line,
-                    indexCount: rectShape.indicesWireframe.count,
-                    indexType: .uint16,
-                    indexBuffer: rectShape.indexBufferWireframe!,
-                    indexBufferOffset: 0,
-                    instanceCount: buffer.vertexCount - 1
-                )
+                drawInstancedShapes(encoder: encoder, shape: rectShape, count: buffer.vertexCount-1, wireframe: true)
             }
-            
             
             // draw joins
             if let joinIdxBuffer = buffer.getJoinIndexBuffer(),
@@ -164,29 +158,14 @@ class Renderer: NSObject, MTKViewDelegate {
                 
                 setVertexBytes(encoder: encoder, value: UInt8(roundShape.roundRes), index: BufferIndex.roundRes)
                 setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.drawMode)
-
                 setVertexBytes(encoder: encoder, value: UInt8(options.debug ? 1 : 0), index: BufferIndex.debug)
-
                 
-                encoder.drawIndexedPrimitives(
-                    type: .triangle,
-                    indexCount: roundShape.indicesTriangle.count,
-                    indexType: .uint16,
-                    indexBuffer: roundShape.indexBufferTriangle!,
-                    indexBufferOffset: 0,
-                    instanceCount: buffer.joinCount
-                )
+                drawInstancedShapes(encoder: encoder, shape: roundShape, count: buffer.joinCount)
+
                 if options.wireFrame
                 {
                     setVertexBytes(encoder: encoder, value: UInt8(1), index: BufferIndex.drawMode)
-                    encoder.drawIndexedPrimitives(
-                        type: .line,
-                        indexCount: roundShape.indicesWireframe.count,
-                        indexType: .uint16,
-                        indexBuffer: roundShape.indexBufferWireframe!,
-                        indexBufferOffset: 0,
-                        instanceCount: buffer.joinCount
-                    )
+                    drawInstancedShapes(encoder: encoder, shape: roundShape, count: buffer.joinCount, wireframe: true)
                 }
             }
             
@@ -201,13 +180,7 @@ class Renderer: NSObject, MTKViewDelegate {
                     setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.pointStep)
 
                     // draw center line
-                    encoder.drawIndexedPrimitives(
-                        type: .line,
-                        indexCount: buffer.centerLineIndexCount,
-                        indexType: .uint16,
-                        indexBuffer: idxbuffer,
-                        indexBufferOffset: 0
-                    )
+                    drawInstancedLines(encoder: encoder, count: buffer.centerLineIndexCount, indexBuffer: idxbuffer)
                     
                     // draw points
                     setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.pointStep)
@@ -218,23 +191,40 @@ class Renderer: NSObject, MTKViewDelegate {
                 }
             }
         }
-        
     }
     
+    private func drawInstancedShapes (
+        encoder: MTLRenderCommandEncoder,
+        shape: BufferedStrokeShape,
+        count: Int,
+        wireframe: Bool=false
+    ) {
+        encoder.drawIndexedPrimitives(
+            type: wireframe ? .line : .triangle,
+            indexCount: wireframe ? shape.indicesWireframe.count : shape.indicesTriangle.count,
+            indexType: .uint16,
+            indexBuffer: wireframe ? shape.indexBufferWireframe! : shape.indexBufferTriangle!,
+            indexBufferOffset: 0,
+            instanceCount: count
+        )
+    }
+    
+    
+    private func drawInstancedLines (encoder: MTLRenderCommandEncoder, count: Int, indexBuffer: any MTLBuffer) {
+        encoder.drawIndexedPrimitives(
+            type: .line,
+            indexCount: count,
+            indexType: .uint16,
+            indexBuffer: indexBuffer,
+            indexBufferOffset: 0
+        )
+    }
+    
+    /*
+     Set single value Bytes
+     */
     private func setVertexBytes<T: FixedWidthInteger> (encoder: MTLRenderCommandEncoder, value: T, index: BufferIndex) {
         var val = value
         encoder.setVertexBytes(&val, length: MemoryLayout<T>.size, index: index.rawValue)
-    }
-    
-    enum BufferIndex: Int {
-        case mainVertex = 0
-        case rectShape = 1
-        case roundShape = 2
-        case roundRes = 3
-        case joinIndex = 4
-        case capIndex = 5
-        case drawMode = 9
-        case pointStep = 10
-        case debug = 20
     }
 }
