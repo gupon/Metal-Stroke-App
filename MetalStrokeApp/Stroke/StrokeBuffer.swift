@@ -9,14 +9,13 @@ class StrokeBuffer {
     private var currChunkNum: Int = 0
     
     private(set) var vertexBuffer: MTLBuffer?
-    private(set) var joinIndexBuffer: MTLBuffer?
-    private(set) var capIndexBuffer: MTLBuffer?
+    private(set) var roundIndexBuffer: MTLBuffer?
+    private(set) var bevelIndexBuffer: MTLBuffer?
 
     private(set) var vertexCount:Int = 0
-    private(set) var joinCount:Int = 0
-    private(set) var capCount:Int = 0
+    private(set) var bevelCount:Int = 0
+    private(set) var roundCount:Int = 0
 
-    
     private(set) var centerLineIndexCount = 0
     private(set) var centerLineIndexBuffer:MTLBuffer?
     
@@ -82,8 +81,8 @@ class StrokeBuffer {
         let newChunkNum = (newVertexNum + BFFR_CHNK_SIZE - 1) / BFFR_CHNK_SIZE
         let newCapacity = newChunkNum * BFFR_CHNK_SIZE
         
-        var joinIndices: [Int] = []
-        var capIndices: [Int] = []
+        var roundIndices: [Int] = []
+        var bevelIndices: [Int] = []
 
         // expand buffer if necesarry
         if currChunkNum < newChunkNum {
@@ -98,35 +97,37 @@ class StrokeBuffer {
                 ptr[i] = vertex
                 ptr[i].radius *= model.strokeWidthScale
                 
-                if vertex.end == 0 && vertex.joinType != .miter {
-                    joinIndices.append(i)
+                if (vertex.end == 0 && vertex.joinType == .round)
+                    || (vertex.end != 0  && vertex.capType == .round) {
+                    roundIndices.append(i)
                 }
                 
-                if vertex.end != 0 && vertex.capType != .butt {
-                    capIndices.append(i)
+                if (vertex.end == 0 && vertex.joinType == .bevel) {
+                    bevelIndices.append(i)
                 }
             }
             
+            // fill rest capacity with empty
             (ptr + newVertexNum).initialize(
                 repeating: StrokeBuffer.VTX_EMPTY,
                 count: newCapacity - newVertexNum
             )
         }
         
-        self.joinCount = joinIndices.count
-        self.capCount = capIndices.count
+        self.roundCount = roundIndices.count
+        self.bevelCount = bevelIndices.count
 
-        if !joinIndices.isEmpty {
-            self.joinIndexBuffer = device.makeBuffer(
-                bytes: joinIndices.map{UInt16($0)},
-                length: MemoryLayout<UInt16>.size * joinIndices.count
+        if !roundIndices.isEmpty {
+            self.roundIndexBuffer = device.makeBuffer(
+                bytes: roundIndices.map{UInt16($0)},
+                length: MemoryLayout<UInt16>.size * roundIndices.count
             )
         }
         
-        if !capIndices.isEmpty {
-            self.capIndexBuffer = device.makeBuffer(
-                bytes: capIndices.map{UInt16($0)},
-                length: MemoryLayout<UInt16>.size * capIndices.count
+        if !bevelIndices.isEmpty {
+            self.bevelIndexBuffer = device.makeBuffer(
+                bytes: bevelIndices.map{UInt16($0)},
+                length: MemoryLayout<UInt16>.size * bevelIndices.count
             )
         }
 
@@ -135,6 +136,7 @@ class StrokeBuffer {
         self.vertexCount = newVertexNum
         model.isDirty = false
     }
+    
     
     func updateCenterIndexBuffer(from strokes:[StrokeModel.Stroke], device: MTLDevice) {
         guard strokes.count > 0 else { return }
@@ -163,11 +165,11 @@ class StrokeBuffer {
         vertexCount > 1 ? vertexBuffer : nil
     }
     
-    func getJoinIndexBuffer() -> MTLBuffer? {
-        joinCount > 0 ? joinIndexBuffer : nil
+    func getRoundIndexBuffer() -> MTLBuffer? {
+        roundCount > 0 ? roundIndexBuffer : nil
     }
     
-    func getCapIndexBuffer() -> MTLBuffer? {
-        capCount > 0 ? capIndexBuffer : nil
+    func getBevelIndexBuffer() -> MTLBuffer? {
+        bevelCount > 0 ? bevelIndexBuffer : nil
     }
 }

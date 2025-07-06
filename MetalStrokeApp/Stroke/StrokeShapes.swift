@@ -56,6 +56,23 @@ class BaseShape: BufferedStrokeShape {
     }
 }
 
+class Triangle: BaseShape {
+    init() {
+        let vertices = Array(repeating: SIMD2<Float>(0, 0), count: 3)
+        let indicesTriangle: [UInt16] = [0, 1, 2]
+        let indicesWireframe: [UInt16] = [
+            0, 1,
+            1, 2,
+            2, 0
+        ]
+        
+        super.init(
+            vertices: vertices,
+            indicesTriangle: indicesTriangle,
+            indicesWireframe: indicesWireframe
+        )
+    }
+}
 
 class Rectangle: BaseShape {
     init() {
@@ -96,7 +113,7 @@ class RoundShape: BaseShape {
         var indicesFill: [Int] = []
         var indicesWire: [Int] = [0, 1]
 
-        let angleStep = Float.pi * 0.5 / Float(roundRes)
+        let angleStep = Float.pi / Float(roundRes)
         var vertices: [SIMD2<Float>] = [[0.0, 0.0]]     // add origin
         
         for i in 0...roundRes {

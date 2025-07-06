@@ -34,26 +34,35 @@ class StrokeModel: ObservableObject {
     public var strokeWidthScale: Float = 1
     
     
-    enum CapType: UInt8 {
+    enum CapType: UInt8, CaseIterable {
         case butt = 0, square = 1, round = 2
     }
     
-    enum JoinType: UInt8 {
+    enum JoinType: UInt8, CaseIterable {
         case miter = 0, bevel = 1, round = 2
     }
     
+    /*
+     mark stroke first/end point as ends
+     */
     public func markEndVertices() {
         var end: Float = 0
+        var cap: CapType = .square
         
         strokes.forEach() { stroke in
             if stroke.vertices.count > 1 {
                 for i in 0 ..< stroke.vertices.count {
                     switch i {
-                    case 0: end = -1
-                    case stroke.vertices.count - 1: end = 1
-                    default: end = 0
+                        case 0:
+                            end = -1
+//                        cap = .square
+                        case stroke.vertices.count - 1:
+                            end = 1
+//                        cap = .square
+                        default: end = 0
                     }
                     stroke.vertices[i].end = end
+                    stroke.vertices[i].capType = cap
                 }
             }
         }
@@ -89,7 +98,8 @@ class StrokeModel: ObservableObject {
                 position: pos,
                 color: color,
                 radius: radius,
-                joinType: [JoinType.miter, JoinType.round][Int.random(in: 0...1)]
+                capType: .round,
+                joinType: JoinType.allCases.randomElement()!
             )
             stroke.vertices.append(vert)
             isDirty = true

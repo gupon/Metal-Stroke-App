@@ -11,8 +11,8 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
     private let cmdQueue: MTLCommandQueue
     
     private var mainPipeline: MTLRenderPipelineState?
-    private var capsPipeline: MTLRenderPipelineState?
-    private var joinPipeline: MTLRenderPipelineState?
+    private var bevelCapsPipeline: MTLRenderPipelineState?
+    private var roundCapsPipeline: MTLRenderPipelineState?
     private var debugPipeline: MTLRenderPipelineState?
 
     private var tLastDraw: CFTimeInterval = CACurrentMediaTime()
@@ -24,6 +24,7 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
     private var model: StrokeModel
     
     private var rectShape: Rectangle
+    private var bevelShape: Triangle
     private var roundShape: RoundShape
     
     enum BufferIndex: Int {
@@ -31,8 +32,9 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
         case rectShape = 1
         case roundShape = 2
         case roundRes = 3
-        case joinIndex = 4
-        case capIndex = 5
+        case roundIndex = 4
+        case bevelShape = 5
+        case bevelIndex = 6
         case drawMode = 9
         case pointStep = 10
         case debug = 20
@@ -56,8 +58,12 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
         self.rectShape = Rectangle()
         rectShape.createBuffers(device)
         
+        self.bevelShape = Triangle()
+        bevelShape.createBuffers(device)
+        
         self.roundShape = RoundShape(roundRes: 16)
         roundShape.createBuffers(device)
+        
 
         // init super after self member initialization
         // but before member function call
@@ -65,7 +71,8 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
 
         // build pipelines
         self.mainPipeline = buildPipeline(vertfunc: "vert_main", fragfunc: "frag_main", enableAlpha: true)
-        self.joinPipeline = buildPipeline(vertfunc: "vert_join", fragfunc: "frag_main", enableAlpha: true)
+        self.roundCapsPipeline = buildPipeline(vertfunc: "vert_round", fragfunc: "frag_main", enableAlpha: true)
+        self.bevelCapsPipeline = buildPipeline(vertfunc: "vert_bevel", fragfunc: "frag_main", enableAlpha: true)
         self.debugPipeline = buildPipeline(vertfunc: "vert_debug", fragfunc: "frag_main", enableAlpha: true)
     }
     
@@ -145,26 +152,46 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
                 drawInstancedShapes(encoder: encoder, shape: rectShape, count: buffer.vertexCount-1, wireframe: true)
             }
             
-            // draw joins
-            if let joinIdxBuffer = buffer.getJoinIndexBuffer(),
-               let joinPipeline = self.joinPipeline
+            // draw round joins/caps
+            if let indexBuffer = buffer.getRoundIndexBuffer(),
+               let pipeline = self.roundCapsPipeline
             {
                 
-                encoder.setRenderPipelineState(joinPipeline)
-                
+                encoder.setRenderPipelineState(pipeline)
                 encoder.setVertexBuffer(roundShape.vertexBuffer, offset:0, index: BufferIndex.roundShape.rawValue)
-                encoder.setVertexBuffer(joinIdxBuffer, offset: 0, index: BufferIndex.joinIndex.rawValue)
+                encoder.setVertexBuffer(indexBuffer, offset: 0, index: BufferIndex.roundIndex.rawValue)
                 
                 setVertexBytes(encoder: encoder, value: UInt8(roundShape.roundRes), index: BufferIndex.roundRes)
                 setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.drawMode)
                 setVertexBytes(encoder: encoder, value: UInt8(options.debug ? 1 : 0), index: BufferIndex.debug)
                 
-                drawInstancedShapes(encoder: encoder, shape: roundShape, count: buffer.joinCount)
+                drawInstancedShapes(encoder: encoder, shape: roundShape, count: buffer.roundCount)
 
                 if options.wireFrame
                 {
                     setVertexBytes(encoder: encoder, value: UInt8(1), index: BufferIndex.drawMode)
-                    drawInstancedShapes(encoder: encoder, shape: roundShape, count: buffer.joinCount, wireframe: true)
+                    drawInstancedShapes(encoder: encoder, shape: roundShape, count: buffer.roundCount, wireframe: true)
+                }
+            }
+            
+            // draw bevel joins
+            if let indexBuffer = buffer.getBevelIndexBuffer(),
+               let pipeline = self.bevelCapsPipeline
+            {
+                
+                encoder.setRenderPipelineState(pipeline)
+                encoder.setVertexBuffer(bevelShape.vertexBuffer, offset:0, index: BufferIndex.bevelShape.rawValue)
+                encoder.setVertexBuffer(indexBuffer, offset: 0, index: BufferIndex.bevelIndex.rawValue)
+                
+                setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.drawMode)
+                setVertexBytes(encoder: encoder, value: UInt8(options.debug ? 1 : 0), index: BufferIndex.debug)
+                
+                drawInstancedShapes(encoder: encoder, shape: bevelShape, count: buffer.bevelCount)
+                
+                if options.wireFrame
+                {
+                    setVertexBytes(encoder: encoder, value: UInt8(1), index: BufferIndex.drawMode)
+                    drawInstancedShapes(encoder: encoder, shape: bevelShape, count: buffer.bevelCount, wireframe: true)
                 }
             }
             
@@ -185,8 +212,11 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
                     setVertexBytes(encoder: encoder, value: UInt8(0), index: BufferIndex.pointStep)
                     encoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: buffer.vertexCount)
                     
+                    // draw colored square inside point
+                    /*
                     setVertexBytes(encoder: encoder, value: UInt8(1), index: BufferIndex.pointStep)
                     encoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: buffer.vertexCount )
+                    */
                 }
             }
         }

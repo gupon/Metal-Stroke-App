@@ -1,20 +1,25 @@
 #include <metal_stdlib>
 using namespace metal;
 
+// math
 #define PI acos(-1.)
 #define PIH acos(0.)
 
+
 // match with Renderer > BufferIndex
 #define BUFID_VERTEX 0
-#define BUFID_RECT 1
-#define BUFID_ROUND 2
-#define BUFID_ROUNDRES 3
-#define BUFID_JOINS 4
-#define BUFID_CAPS 5
-#define BUFID_DRAWMODE 9
-#define BUFID_POINTSTEP 10
+#define BUFID_RECT_SHAPE 1
+#define BUFID_ROUND_SHAPE 2
+#define BUFID_ROUND_RES 3
+#define BUFID_ROUND_IDX 4
+#define BUFID_BEVEL_SHAPE 5
+#define BUFID_BEVEL_IDX 6
+#define BUFID_DRAW_MODE 9
+#define BUFID_POINT_STEP 10
 #define BUFID_DEBUG 20
 
+
+// match with StrokeModel > Vertex
 struct StrokeVertex {
     packed_float2 pos;
     float4 color;
@@ -26,12 +31,18 @@ struct StrokeVertex {
     uchar reserved1;
 };
 
+
+// vert -> frag
 struct VtxOut {
     float4 pos [[position]];
     float4 color;
     float ptsize [[point_size]] = 6.0;
 };
 
+
+/*
+ rotate matrix (rotate & scaleX option to keep stroke width)
+ */
 float2x2 rotateSkewMat(float angle, bool skew=false) {
     float s = sin(angle);
     float c = cos(angle);
@@ -78,10 +89,16 @@ float4 calcRoundJoinColor (StrokeVertex v0, StrokeVertex vPrev, StrokeVertex vNe
 
 
 
+/*
+ Vertex Shaders
+ */
+
+// main rect body
 vertex VtxOut vert_main (
     const device StrokeVertex* vertices[[buffer(BUFID_VERTEX)]],
-    const device float2* rectPos[[buffer(BUFID_RECT)]],
-    constant uchar& drawMode [[buffer(BUFID_DRAWMODE)]],
+    const device float2* rectPos[[buffer(BUFID_RECT_SHAPE)]],
+    constant uchar& drawMode [[buffer(BUFID_DRAW_MODE)]],
+    constant uchar& debug [[buffer(BUFID_DEBUG)]],
     uint vid [[vertex_id]],
     uint iid [[instance_id]]
 ) {
@@ -100,31 +117,43 @@ vertex VtxOut vert_main (
     float2 localpos = rectPos[vid];  // pos in rect
     float2 pos = float2(mix(v0.radius, v1.radius, localpos.y) * localpos.x * 2, 0);
 
-    bool isMidStart = localpos.y < 0.5 && v0.end == 0;
-    bool isMidEnd = localpos.y > 0.5 && v1.end == 0;
+    bool isStart = localpos.y < 0.5;
+    StrokeVertex myVert = isStart ? v0 : v1;
     
-    // miter ends
-    if (isMidStart || isMidEnd) {
-        float angleB = vectorAngle(isMidStart ? v0.pos : v1.pos,
-                                   isMidStart ? vertices[iid - 1].pos : vertices[iid + 2].pos);
-        if (isMidStart) angleB -= PI * sign(angleB);    // flip angle
+    bool isEndPt = (isStart && myVert.end == -1) || (!isStart && myVert.end == 1);
+
+    if (!isEndPt) {
+        // miter ends
+        uint otherVertIdx = isStart ? iid - 1 : iid + 2;
+        float angleB = vectorAngle(myVert.pos, vertices[otherVertIdx].pos);
+        if (isStart) angleB -= PI * sign(angleB);    // flip angle
         
-        bool isClockwise = wrap_angle((angleB - angleA) * (isMidStart ? -1 : 1)) < 0;
+        bool isClockwise = wrap_angle((angleB - angleA) * (isStart ? -1 : 1)) < 0;
         bool isInnerSide = (localpos.x > 0) == isClockwise;
         
-        bool isMiter = (isMidStart && v0.joinType == 0) || (isMidEnd && v1.joinType == 0);
-        
-        if (isInnerSide || isMiter)
+        if (isInnerSide || myVert.joinType == 0) // join: miter
             pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
     }
     
-    pos += float2(0, localpos.y) * distance(v0.pos, v1.pos);      // add y
-    pos *= rotateSkewMat(angleA - PIH);     // rotate
-    pos += v0.pos;                          // add base pos
+    // add y
+    float dist = distance(v0.pos, v1.pos);
+    pos += float2(0, localpos.y) * dist;
+    
+    // square cap
+    if (isEndPt && myVert.capType == 1) {
+        pos.y += isStart ? -v0.radius : v1.radius;
+    }
+
+    // rotate all
+    pos *= rotateSkewMat(angleA - PIH);
+    
+    // add base position
+    pos += v0.pos;
     
     // form out
     out.pos = float4(pos, 0, 1);
     out.pos.z = iid * 0.01;
+    
     
     if (drawMode == 0) {
         // fill
@@ -139,50 +168,60 @@ vertex VtxOut vert_main (
 }
 
 
-
-vertex VtxOut vert_join (
+// round join & cap
+vertex VtxOut vert_round (
      const device StrokeVertex* vertices [[buffer(BUFID_VERTEX)]],
-     const device float2* roundPos [[buffer(BUFID_ROUND)]],
-     constant ushort* joinIndices [[buffer(BUFID_JOINS)]],
-     constant uchar& roundRes [[buffer(BUFID_ROUNDRES)]],
-     constant uchar& drawMode [[buffer(BUFID_DRAWMODE)]],
+     const device float2* roundPos [[buffer(BUFID_ROUND_SHAPE)]],
+     constant ushort* roundIndices [[buffer(BUFID_ROUND_IDX)]],
+     constant uchar& roundRes [[buffer(BUFID_ROUND_RES)]],
+     constant uchar& drawMode [[buffer(BUFID_DRAW_MODE)]],
      constant uchar& debug [[buffer(BUFID_DEBUG)]],
      uint vid [[vertex_id]],
      uint iid [[instance_id]]
 ) {
     VtxOut out;
     
-    uint idx = joinIndices[iid];
+    uint idx = roundIndices[iid];
+    
     StrokeVertex v0 = vertices[idx];
-    StrokeVertex vA = vertices[idx - 1];
-    StrokeVertex vB = vertices[idx + 1];
-    
-    float2 pos = float2(0);
-    
-    float angleA = vectorAngle(vA.pos, v0.pos);
-    float angleB = vectorAngle(v0.pos, vB.pos);
+    float2 pos;
 
-    if (vid == 0) {
-        bool isClockwise = wrap_angle(angleB - angleA) < 0;
-        
-        pos = float2(1, 0) * v0.radius;
-        pos *= isClockwise ? 1 : -1;
-        
-        pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
-        pos *= rotateSkewMat(angleA - PIH);
+    StrokeVertex vA, vB;
+    float angleA, angleB;
+    
+    if (v0.end != 0) {
+        // caps
+        pos = roundPos[vid] * v0.radius;
+        vA = vertices[idx + int(-sign(v0.end))];
+        angleA = vectorAngle(v0.pos, vA.pos) + PI;
     } else {
-        float dAngle = wrap_angle(angleB - angleA);
-        float idx_ratio = (vid - 1.0) / roundRes;
-        float angle = dAngle * idx_ratio;
-        
-        pos = float2(cos(angle), sin(angle)) * v0.radius;
-        pos *= sign(dAngle);
-        pos *= rotateSkewMat(angleA - PIH);
+        // joins
+        vA = vertices[idx - 1];
+        vB = vertices[idx + 1];
+        angleA = vectorAngle(vA.pos, v0.pos);
+        angleB = vectorAngle(v0.pos, vB.pos);
+
+        if (vid == 0) {
+            bool isClockwise = wrap_angle(angleB - angleA) < 0;
+            pos = float2(1, 0) * v0.radius;
+            
+            pos *= isClockwise ? 1 : -1;
+            pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+        } else {
+            float dAngle = wrap_angle(angleB - angleA);
+            float idx_ratio = (vid - 1.0) / roundRes;
+            float angle = dAngle * idx_ratio;
+            
+            pos = float2(cos(angle), sin(angle)) * v0.radius;
+            pos *= sign(dAngle);
+        }
     }
-    
+
+    pos *= rotateSkewMat(angleA - PIH);
     pos += v0.pos;
-    out.pos = float4(pos, idx * 0.01, 1);
     
+    out.pos = float4(pos, idx * 0.01, 1);
+
     if (drawMode == 0) {
         // fill
         out.color = debug ? float4(0.75, 0, 0, 1) : v0.color;
@@ -195,13 +234,71 @@ vertex VtxOut vert_join (
     return out;
 }
 
+// bevel join
+vertex VtxOut vert_bevel (
+    const device StrokeVertex* vertices [[buffer(BUFID_VERTEX)]],
+    const device float2* bevelPos [[buffer(BUFID_BEVEL_SHAPE)]],
+    constant ushort* bevelIndices [[buffer(BUFID_BEVEL_IDX)]],
+    constant uchar& drawMode [[buffer(BUFID_DRAW_MODE)]],
+    constant uchar& debug [[buffer(BUFID_DEBUG)]],
+    uint vid [[vertex_id]],
+    uint iid [[instance_id]]
+) {
+    VtxOut out;
+  
+    uint idx = bevelIndices[iid];
+  
+    StrokeVertex v0 = vertices[idx];
+    StrokeVertex vA = vertices[idx - 1];
+    StrokeVertex vB = vertices[idx + 1];
+
+    float angleA = vectorAngle(vA.pos, v0.pos);
+    float angleB = vectorAngle(v0.pos, vB.pos);
+    
+    float2 pos;
+    
+    if (vid == 0) {
+        // origin
+        bool isClockwise = wrap_angle(angleB - angleA) < 0;
+        pos = float2(1, 0) * v0.radius;
+        pos *= isClockwise ? 1 : -1;
+        pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+    } else {
+        // others
+        float dAngle = wrap_angle(angleB - angleA);
+        
+        if (vid == 1)
+            pos = float2(v0.radius, 0);
+        else
+            pos = float2(cos(dAngle), sin(dAngle)) * v0.radius;
+        
+        pos *= sign(dAngle);
+    }
+    
+    pos *= rotateSkewMat(angleA - PIH);
+    pos += v0.pos;
+
+    out.pos = float4(pos, idx * 0.01, 1);
+
+    if (drawMode == 0) {
+      // fill
+      out.color = debug ? float4(0., 0.85, 0, 1) : v0.color;
+    } else {
+      // wireframe
+      out.color = float4(1,1,1,0.5);
+      out.pos.z += 0.1;
+    }
+
+    return out;
+}
+
 /*
  for debug wireframes / points
  */
 vertex VtxOut vert_debug (
     const device StrokeVertex* vertices[[buffer(BUFID_VERTEX)]],
     uint vid [[vertex_id]],
-    constant uchar& drawStep [[buffer(BUFID_POINTSTEP)]]
+    constant uchar& drawStep [[buffer(BUFID_POINT_STEP)]]
 ) {
     VtxOut out;
 
@@ -219,6 +316,12 @@ vertex VtxOut vert_debug (
 
     return out;
 }
+
+
+
+/*
+ Fragment Shaders
+ */
 
 fragment float4 frag_main(VtxOut in [[stage_in]]) {
     return in.color;
