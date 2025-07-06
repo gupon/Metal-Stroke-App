@@ -2,10 +2,19 @@ import SwiftUI
 import MetalKit
 
 struct ContentView: View {
-    @StateObject var strokeModel = StrokeModel()
-    @StateObject var renderOptions = RenderOptions()
+    @StateObject private var strokeModel: StrokeModel
+    @StateObject private var renderOptions :RenderOptions
     
     @State private var strokeWidth:Float = 4.0
+    
+    init () {
+        let model = StrokeModel()
+        let options = RenderOptions()
+        
+        _strokeModel = StateObject(wrappedValue: model)
+        _renderOptions = StateObject(wrappedValue: options)
+//        _renderer = StateObject(wrappedValue: Renderer(model, options: options))
+    }
 
     var body: some View {
         VStack {
@@ -19,7 +28,7 @@ struct ContentView: View {
                 Text("FPS \(renderer.fps, specifier: "%.2f")")
                     .foregroundColor(.white)
                     .padding()
-                 */
+                */
             }
             .padding(.bottom, 16)
             

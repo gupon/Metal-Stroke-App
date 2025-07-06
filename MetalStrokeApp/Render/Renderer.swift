@@ -6,7 +6,7 @@ class RenderOptions: ObservableObject {
     @Published var showFPS: Bool = true
 }
 
-class Renderer: NSObject, MTKViewDelegate {
+class Renderer: NSObject, MTKViewDelegate, ObservableObject {
     let device: MTLDevice
     private let cmdQueue: MTLCommandQueue
     
@@ -103,11 +103,10 @@ class Renderer: NSObject, MTKViewDelegate {
     private func updateFPS() {
         fps = 1.0 / (CACurrentMediaTime() - tLastDraw)
         tLastDraw = CACurrentMediaTime()
-        //        print(String(format:"%.2f", fps))
     }
     
     func draw(in view: MTKView) {
-        updateFPS()
+//        self.updateFPS()
         
         model.markEndVertices()
         buffer.updateBuffer(from: model, device: device)
@@ -208,7 +207,6 @@ class Renderer: NSObject, MTKViewDelegate {
             instanceCount: count
         )
     }
-    
     
     private func drawInstancedLines (encoder: MTLRenderCommandEncoder, count: Int, indexBuffer: any MTLBuffer) {
         encoder.drawIndexedPrimitives(

@@ -58,7 +58,12 @@ float fit (float value, float from_min, float from_max, float to_min, float to_m
     return to_min + (value - from_min) / (from_max - from_min) * (to_max - to_min);
 }
 
-float4 calcJoinColor (StrokeVertex v0, StrokeVertex vPrev, StrokeVertex vNext, float miterAngle, float ratio) {
+/*
+ Interpolate color inside Round Join
+ 
+ slightly shift color toward prev/next vertex color
+ */
+float4 calcRoundJoinColor (StrokeVertex v0, StrokeVertex vPrev, StrokeVertex vNext, float miterAngle, float ratio) {
     StrokeVertex vB = ratio < 0.5 ? vPrev : vNext;
     
     float dist = distance(v0.pos, vB.pos);
@@ -71,31 +76,6 @@ float4 calcJoinColor (StrokeVertex v0, StrokeVertex vPrev, StrokeVertex vNext, f
     return mix(v0.color, vB.color, weight);
 }
 
-
-/*
- for debug wireframes / points
- */
-vertex VtxOut vert_debug (
-    const device StrokeVertex* vertices[[buffer(BUFID_VERTEX)]],
-    uint vid [[vertex_id]],
-    constant uchar& drawStep [[buffer(BUFID_POINTSTEP)]]
-) {
-    VtxOut out;
-    
-    StrokeVertex vtx = vertices[vid];
-    out.pos = float4(vtx.pos, 0.2, 1);
-    
-    if (drawStep == 0) {
-        out.color = float4(1,1,1,1);
-        out.ptsize = 16.0 * 0.5;
-    } else if (drawStep == 1) {
-        out.color = vtx.color;
-        out.ptsize = 14.0 * 0.0;
-        out.pos.z += 0.2;
-    }
-    
-    return out;
-}
 
 
 vertex VtxOut vert_main (
@@ -210,6 +190,31 @@ vertex VtxOut vert_join (
         // wireframe
         out.color = float4(1,1,1,0.5);
         out.pos.z += 0.1;
+    }
+
+    return out;
+}
+
+/*
+ for debug wireframes / points
+ */
+vertex VtxOut vert_debug (
+    const device StrokeVertex* vertices[[buffer(BUFID_VERTEX)]],
+    uint vid [[vertex_id]],
+    constant uchar& drawStep [[buffer(BUFID_POINTSTEP)]]
+) {
+    VtxOut out;
+
+    StrokeVertex vtx = vertices[vid];
+    out.pos = float4(vtx.pos, 0.2, 1);
+
+    if (drawStep == 0) {
+        out.color = float4(1,1,1,1);
+        out.ptsize = 16.0 * 0.5;
+    } else if (drawStep == 1) {
+        out.color = vtx.color;
+        out.ptsize = 14.0 * 0.0;
+        out.pos.z += 0.2;
     }
 
     return out;
