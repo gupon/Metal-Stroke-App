@@ -113,7 +113,7 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
     }
     
     func draw(in view: MTKView) {
-//        self.updateFPS()
+        self.updateFPS()
         
         model.markEndVertices()
         buffer.updateBuffer(from: model, device: device)

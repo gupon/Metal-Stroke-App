@@ -11,12 +11,13 @@ import MetalKit
 struct MetalView: NSViewRepresentable {
     @EnvironmentObject var strokeModel: StrokeModel
     @EnvironmentObject var renderOptions: RenderOptions
-    
+    @EnvironmentObject var renderer: Renderer
+
     // draw properties from contentView
     @Binding var strokeWidth: Float
     
     func makeCoordinator() -> Renderer {
-        Renderer(strokeModel, options: renderOptions)
+        renderer
     }
     
     func updateNSView(_ nsView: MTKView, context: Context) {
@@ -25,7 +26,12 @@ struct MetalView: NSViewRepresentable {
     
     func makeNSView(context: Context) -> MTKView {
         let view = InteractiveMTKView(frame:NSRect.zero , device: context.coordinator.device, data: self.strokeModel)
-        view.clearColor = MTLClearColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1.0)
+        view.clearColor = MTLClearColor(
+            red: 0xE6 / 0xFF,
+            green: 0xE2 / 0xFF,
+            blue: 0xDB / 0xFF,
+            alpha: 1.0
+        )
         view.delegate = context.coordinator
         view.renderer = context.coordinator
         view.framebufferOnly = true  // which is default
@@ -124,7 +130,7 @@ class InteractiveMTKView: MTKView {
     }
     
     
-    /* Helper Funcs */
+    /* Helpers */
     
     override func viewDidMoveToWindow() {
         self.window?.makeFirstResponder(self)

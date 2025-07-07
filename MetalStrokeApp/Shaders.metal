@@ -37,6 +37,7 @@ struct VtxOut {
     float4 pos [[position]];
     float4 color;
     float ptsize [[point_size]] = 6.0;
+    float2 uv = float2(0.5);
 };
 
 
@@ -142,6 +143,12 @@ vertex VtxOut vert_main (
     // square cap
     if (isEndPt && myVert.capType == 1) {
         pos.y += isStart ? -v0.radius : v1.radius;
+    }
+    
+    // debug
+    if (debug) {
+        if (v0.capType == 1 || v1.capType == 1) 
+            out.uv.x = pos.y / dist;
     }
 
     // rotate all
@@ -324,5 +331,8 @@ vertex VtxOut vert_debug (
  */
 
 fragment float4 frag_main(VtxOut in [[stage_in]]) {
-    return in.color;
+    float4 color = in.color;
+    if (in.uv.x < 0 || in.uv.x > 1)
+        color = float4(0, 0.85, 0, 1);
+    return color;
 }
