@@ -2,7 +2,7 @@ import MetalKit
 
 class RenderOptions: ObservableObject {
     @Published var wireFrame: Bool = true
-    @Published var debug: Bool = true
+    @Published var debug: Bool = false
     @Published var showFPS: Bool = true
 }
 
@@ -14,6 +14,10 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
     private var bevelCapsPipeline: MTLRenderPipelineState?
     private var roundCapsPipeline: MTLRenderPipelineState?
     private var debugPipeline: MTLRenderPipelineState?
+    
+    // depth test
+    private var depthTexture: MTLTexture?
+    private var depthState: MTLDepthStencilState?
 
     private var tLastDraw: CFTimeInterval = CACurrentMediaTime()
     @Published private(set) var fps: Double = 0
@@ -49,6 +53,12 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
         self.device = device
         self.cmdQueue = cmdQueue
         self.model = model
+        
+        // make depthState
+        let depthDesc = MTLDepthStencilDescriptor()
+        depthDesc.isDepthWriteEnabled = true
+        depthDesc.depthCompareFunction = .less
+        self.depthState = device.makeDepthStencilState(descriptor: depthDesc)
         
         self.options = options
 
@@ -97,6 +107,9 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
             colorDesc.destinationRGBBlendFactor = .oneMinusSourceAlpha
             colorDesc.destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
+        
+        // for depth test
+        desc.depthAttachmentPixelFormat = .depth32Float
 
         do {
             return try device.makeRenderPipelineState(descriptor: desc)
@@ -105,7 +118,19 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
         }
     }
     
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        // create depth texture
+        let desc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .depth32Float,
+            width: Int(size.width),
+            height: Int(size.height),
+            mipmapped: false
+        )
+        
+        desc.usage = .renderTarget
+        desc.storageMode = .private
+        self.depthTexture = device.makeTexture(descriptor: desc)
+    }
     
     private func updateFPS() {
         fps = 1.0 / (CACurrentMediaTime() - tLastDraw)
@@ -119,18 +144,25 @@ class Renderer: NSObject, MTKViewDelegate, ObservableObject {
         buffer.updateBuffer(from: model, device: device)
         
         guard let drawable = view.currentDrawable,
-              let descriptor = view.currentRenderPassDescriptor,
-              let cmdBuffer = cmdQueue.makeCommandBuffer(),
-              let encoder = cmdBuffer.makeRenderCommandEncoder(descriptor: descriptor)
-        else {return}
+              let descriptor = view.currentRenderPassDescriptor else { return }
         
+        // set depth texture before making encoder
+        descriptor.depthAttachment.texture = depthTexture
+        descriptor.depthAttachment.clearDepth = 1.0
+        descriptor.depthAttachment.loadAction = .clear
+        descriptor.depthAttachment.storeAction = .store
+
+        guard let cmdBuffer = cmdQueue.makeCommandBuffer(),
+              let encoder = cmdBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {return}
+        
+        encoder.setDepthStencilState(depthState)
+
         defer {
             // always execute before return
             encoder.endEncoding()
             cmdBuffer.present(drawable)
             cmdBuffer.commit()
         }
-        
         
         if let vbuffer = buffer.getVertexBuffer(),
            let mainPipeline = self.mainPipeline

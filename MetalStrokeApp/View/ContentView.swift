@@ -7,9 +7,10 @@ struct ContentView: View {
     @StateObject private var renderer :Renderer
     @StateObject private var frameUpdater: FrameUpdater
     
-    @State private var strokeWidth:Float = 15.0
+    @State private var strokeWidth: Float = 10.0
     @State private var numPoint: Float = 5
-    
+    @State private var isMotionEnabled: Bool = false
+
     init () {
         let model = StrokeModel()
         let options = RenderOptions()
@@ -30,24 +31,18 @@ struct ContentView: View {
                         .environmentObject(renderOptions)
                         .environmentObject(renderer)
                         .onChange(of: context.date) {
-                            frameUpdater.update(context.date)
+                            if (isMotionEnabled) {
+                                frameUpdater.update(context.date)
+                            }
                         }
                 }
                 Text("FPS \(renderer.fps, specifier: "%.2f")")
                     .foregroundColor(.white)
                     .padding()
             }
-            .padding(.bottom, 16)
+            .padding(.bottom, 8)
 
-
-            
-            /*
-            Slider( value: $numPoint,in: 3 ... 20, step: 1)
-                .frame(width: 180)
-                .padding()
-                .onChange(of: numPoint) { frameUpdater.numpt = Int(numPoint) }
-             */
-            HStack {
+            HStack (alignment: .center) {
                 VStack (alignment: .leading, spacing: 12) {
                     HStack {
                         Slider( value: $strokeWidth, in: 0 ... 20)
@@ -55,26 +50,31 @@ struct ContentView: View {
                             .padding(.trailing, 8)
                         
                         Text("Width Scale: \(strokeWidth, specifier: "%.1f")")
-                            .font(.custom("Monaco", size: 14))
                     }
                     HStack {
                         Slider( value: $numPoint,in: 5 ... 30, step: 1)
                             .frame(width: 180)
                             .padding(.trailing, 8)
+                            .disabled(!isMotionEnabled)
                             .onChange(of: numPoint) { frameUpdater.numpt = Int(numPoint) }
                         
                         Text("Num Points: \(numPoint, specifier: "%.f")")
-                            .font(.custom("Monaco", size: 14))
                     }
                 }
                 
                 Spacer()
                 
-                VStack (alignment: .leading, spacing: 12) {
+                VStack (alignment: .leading, spacing: 8) {
                     Toggle("Wireframe", isOn: $renderOptions.wireFrame)
-                    Toggle("Debug", isOn: $renderOptions.debug)
+                    Toggle("Debug Color", isOn: $renderOptions.debug)
+                    Toggle("Wave Motion", isOn: $isMotionEnabled)
+                        .onChange(of: isMotionEnabled) {
+                            if !isMotionEnabled {
+                                strokeModel.clearAll()
+                            }
+                        }
                 }
-                .padding(.trailing, 16)
+                .padding(.trailing, 18)
             }
         }
     }

@@ -21,8 +21,7 @@ class FrameUpdater: ObservableObject {
         let t = Float(date.timeIntervalSince(startDate))
         
         let stroke = StrokeModel.Stroke()
-        
-        let typeOffset = Int(floor(t / 1.0))
+        let typeIndex = Int(floor(t / 1.0)) % 3
         
         for i in 0 ..< numpt {
             let u = Float(i) / Float(numpt - 1)
@@ -34,8 +33,8 @@ class FrameUpdater: ObservableObject {
                 position: SIMD2<Float>(x, y),
                 color: SIMD4<Float>(0.0, 0.2, 0.75, 1),
                 radius: 0.01,
-                capType: capTypes[(i + typeOffset) % 3],
-                joinType: joinTypes[(i + typeOffset) % 3]
+                capType: capTypes[typeIndex],
+                joinType: joinTypes[typeIndex]
             )
             stroke.vertices.append(v)
         }

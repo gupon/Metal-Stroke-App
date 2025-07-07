@@ -19,6 +19,13 @@ using namespace metal;
 #define BUFID_DEBUG 20
 
 
+// z range: 0.0(front) ~ 1.0(back)
+#define Z_MAX 0.999
+#define Z_STEP 0.001
+#define Z_WIRE_OFF -0.001
+#define Z_CENTER_LINE 0.1
+
+
 // match with StrokeModel > Vertex
 struct StrokeVertex {
     packed_float2 pos;
@@ -159,7 +166,7 @@ vertex VtxOut vert_main (
     
     // form out
     out.pos = float4(pos, 0, 1);
-    out.pos.z = iid * 0.01;
+    out.pos.z = Z_MAX - iid * Z_STEP;
     
     
     if (drawMode == 0) {
@@ -168,7 +175,7 @@ vertex VtxOut vert_main (
     } else if (drawMode == 1) {
         // wireframe
         out.color = float4(1,1,1,0.5);
-        out.pos.z += 0.1;
+        out.pos.z += Z_WIRE_OFF;
     }
     
     return out;
@@ -227,7 +234,7 @@ vertex VtxOut vert_round (
     pos *= rotateSkewMat(angleA - PIH);
     pos += v0.pos;
     
-    out.pos = float4(pos, idx * 0.01, 1);
+    out.pos = float4(pos, Z_MAX - idx * Z_STEP, 1);
 
     if (drawMode == 0) {
         // fill
@@ -235,7 +242,7 @@ vertex VtxOut vert_round (
     } else {
         // wireframe
         out.color = float4(1,1,1,0.5);
-        out.pos.z += 0.1;
+        out.pos.z += Z_WIRE_OFF;
     }
 
     return out;
@@ -285,15 +292,15 @@ vertex VtxOut vert_bevel (
     pos *= rotateSkewMat(angleA - PIH);
     pos += v0.pos;
 
-    out.pos = float4(pos, idx * 0.01, 1);
+    out.pos = float4(pos, Z_MAX - idx * Z_STEP, 1);
 
     if (drawMode == 0) {
-      // fill
-      out.color = debug ? float4(0., 0.85, 0, 1) : v0.color;
+        // fill
+        out.color = debug ? float4(0., 0.85, 0, 1) : v0.color;
     } else {
-      // wireframe
-      out.color = float4(1,1,1,0.5);
-      out.pos.z += 0.1;
+        // wireframe
+        out.color = float4(1,1,1,0.5);
+        out.pos.z += Z_WIRE_OFF;
     }
 
     return out;
@@ -310,15 +317,15 @@ vertex VtxOut vert_debug (
     VtxOut out;
 
     StrokeVertex vtx = vertices[vid];
-    out.pos = float4(vtx.pos, 0.2, 1);
-
+    out.pos = float4(vtx.pos, Z_CENTER_LINE, 1);
+    
     if (drawStep == 0) {
-        out.color = float4(1,1,1,1);
+        out.color = float4(1,1,1,0.5);
         out.ptsize = 16.0 * 0.5;
     } else if (drawStep == 1) {
         out.color = vtx.color;
         out.ptsize = 14.0 * 0.0;
-        out.pos.z += 0.2;
+        out.pos.z -= 0.01;
     }
 
     return out;
