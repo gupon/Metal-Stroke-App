@@ -22,8 +22,8 @@ So you can
 
 ### Make full use of instanced drawing
 - No per-frame mesh construction on the CPU
-  - only list of vertex & attributes are passed to shaders
-- Entire stroke is formed from basic 3 shapes (quad, triangle, pie)
+  - only list of vertices & attributes are passed to shaders
+- Entire stroke is formed from three basic shapes (quad, triangle, pie)
   - each is deformed in the vertex shader
   - no polygon overlapping in caps/joins
     - works well with gradients, alpha blending
