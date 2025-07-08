@@ -73,7 +73,13 @@ class StrokeModel: ObservableObject {
 //        print("start stroke: \(strokes.count)")
     }
     
-    func addPoint(pos: SIMD2<Float>, color: SIMD4<Float>, radius: Float=0.05) {
+    func addPoint(
+        pos: SIMD2<Float>,
+        color: SIMD4<Float>,
+        radius: Float=0.05,
+        capType: StrokeModel.CapType = .round,
+        joinType: StrokeModel.JoinType = .round
+    ) {
         let firstPoint = currentStroke == nil
         if firstPoint {
             startStroke()
@@ -84,8 +90,8 @@ class StrokeModel: ObservableObject {
                 position: pos,
                 color: color,
                 radius: radius,
-                capType: .round,
-                joinType: JoinType.allCases.randomElement()!
+                capType: capType,
+                joinType: joinType
             )
             stroke.vertices.append(vert)
             isDirty = true
@@ -93,6 +99,11 @@ class StrokeModel: ObservableObject {
         
 //        print("stroke: \(strokes.count), vert: \(currentStroke!.vertices.count)")
 //        strokes.forEach { str in print(str.vertices) }
+    }
+    
+    func setStrokes(_ strokes: [Stroke]) {
+        self.strokes = strokes
+        self.isDirty = true
     }
     
     func endStroke() {

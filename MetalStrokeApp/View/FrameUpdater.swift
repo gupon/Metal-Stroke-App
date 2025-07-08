@@ -39,8 +39,6 @@ class FrameUpdater: ObservableObject {
             stroke.vertices.append(v)
         }
         
-        model.strokes = [stroke]
-        model.isDirty = true
-//        print(t)
+        model.setStrokes([stroke])
     }
 }

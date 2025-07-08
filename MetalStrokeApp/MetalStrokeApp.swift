@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct _50425MetalTriangleApp: App {
+struct MetalStrokeApp: App {
     var body: some Scene {
         let W: CGFloat = 640
         WindowGroup {

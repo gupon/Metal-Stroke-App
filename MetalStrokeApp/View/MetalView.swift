@@ -34,10 +34,10 @@ struct MetalView: NSViewRepresentable {
         )
         view.delegate = context.coordinator
         view.renderer = context.coordinator
-        view.framebufferOnly = true  // which is default
         
         // default values
         /*
+        view.framebufferOnly = true  // which is default
         view.enableSetNeedsDisplay = false
         view.isPaused = false
         view.preferredFramesPerSecond = 60
@@ -48,12 +48,14 @@ struct MetalView: NSViewRepresentable {
     
 }
 
+
 class InteractiveMTKView: MTKView {
     weak var renderer: Renderer?
     
     private var strokeModel: StrokeModel
-    
     private var baseHue: CGFloat = 0.5
+    
+    // used for drag-to-scale
     private var minRadius: Float = 0.015
     private var dragStartPos: SIMD2<Float>?
     
@@ -67,8 +69,14 @@ class InteractiveMTKView: MTKView {
         super.init(coder: coder)
     }
     
+    override func viewDidMoveToWindow() {
+        self.window?.makeFirstResponder(self)
+    }
     
-    /* Mouse Events */
+
+    /*
+     Mouse Events
+     */
     
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
@@ -84,7 +92,9 @@ class InteractiveMTKView: MTKView {
         strokeModel.addPoint(
             pos: pos,
             color: colorToSIMD4(color),
-            radius: minRadius
+            radius: minRadius,
+            joinType: .bevel
+            
         )
         
         self.dragStartPos = pos
@@ -115,7 +125,9 @@ class InteractiveMTKView: MTKView {
     }
     
     
-    /* Keyboard Events */
+    /*
+     Keyboard Events
+     */
     
     override var acceptsFirstResponder: Bool { true }
     
@@ -130,11 +142,9 @@ class InteractiveMTKView: MTKView {
     }
     
     
-    /* Helpers */
-    
-    override func viewDidMoveToWindow() {
-        self.window?.makeFirstResponder(self)
-    }
+    /*
+     Helpers
+     */
     
     private func toMetalPos(_ pos: NSPoint) -> SIMD2<Float> {
         let localpos = convert(pos, from:nil)

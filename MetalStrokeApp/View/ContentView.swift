@@ -7,7 +7,7 @@ struct ContentView: View {
     @StateObject private var renderer :Renderer
     @StateObject private var frameUpdater: FrameUpdater
     
-    @State private var strokeWidth: Float = 10.0
+    @State private var strokeWidth: Float = 5.0
     @State private var numPoint: Float = 5
     @State private var isMotionEnabled: Bool = false
 
