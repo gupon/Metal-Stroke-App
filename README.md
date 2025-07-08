@@ -1,7 +1,7 @@
-# Metal Stroke App
-
 ![Preview](Images/app_preview01.png)
 ![Preview](Images/app_preview02.png)
+
+# Metal Stroke App
 
 A stroke-drawing app built with Metal + SwiftUI.  
 Created as a small exercise in learning Metal, focusing on implementing the basic features of stroke rendering.
