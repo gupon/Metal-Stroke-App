@@ -56,6 +56,7 @@ class BaseShape: BufferedStrokeShape {
     }
 }
 
+
 class Triangle: BaseShape {
     init() {
         let vertices = Array(repeating: SIMD2<Float>(0, 0), count: 3)
@@ -73,6 +74,7 @@ class Triangle: BaseShape {
         )
     }
 }
+
 
 class Rectangle: BaseShape {
     init() {
@@ -132,5 +134,4 @@ class RoundShape: BaseShape {
             indicesWireframe: indicesWire.map(UInt16.init)
         )
     }
-    
 }
