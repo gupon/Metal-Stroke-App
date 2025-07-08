@@ -97,12 +97,17 @@ class StrokeBuffer {
                 ptr[i] = vertex
                 ptr[i].radius *= model.strokeWidthScale
                 
-                if (vertex.end == 0 && vertex.joinType == .round)
-                    || (vertex.end != 0  && vertex.capType == .round) {
+                if (
+                    (vertex.end == 0 && vertex.joinType == .round)
+                    || (vertex.end != 0  && vertex.capType == .round)
+                ) {
                     roundIndices.append(i)
                 }
                 
-                if (vertex.end == 0 && vertex.joinType == .bevel) {
+                if (
+                    vertex.end == 0
+                    && (vertex.joinType == .bevel || vertex.joinType == .miter) // for miter limit
+                ) {
                     bevelIndices.append(i)
                 }
             }

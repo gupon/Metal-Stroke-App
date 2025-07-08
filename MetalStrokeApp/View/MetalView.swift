@@ -57,7 +57,6 @@ class InteractiveMTKView: MTKView {
     
     // used for drag-to-scale
     private var minRadius: Float = 0.015
-    private var dragStartPos: SIMD2<Float>?
     
     init(frame frameRect: CGRect, device: (any MTLDevice)?, data:StrokeModel) {
         self.strokeModel = data
@@ -93,23 +92,15 @@ class InteractiveMTKView: MTKView {
             pos: pos,
             color: colorToSIMD4(color),
             radius: minRadius,
-            joinType: .bevel
-            
+            joinType: StrokeModel.JoinType.allCases.randomElement()!
         )
-        
-        self.dragStartPos = pos
     }
     
     override func mouseDragged(with event: NSEvent) {
         super.mouseDragged(with: event)
         
-        /*
-        if let startPos = dragStartPos {
-            let localPos = toMetalPos(event.locationInWindow)
-            let dist = simd_length(localPos - startPos)
-            strokeModel.setFinalRadius(max(dist, minRadius))
-        }
-        */
+        let localPos = toMetalPos(event.locationInWindow)
+        strokeModel.updateLatestPosition(localPos)
     }
     
     override func rightMouseDown(with event: NSEvent) {
@@ -119,9 +110,6 @@ class InteractiveMTKView: MTKView {
     
     override func mouseUp(with event: NSEvent) {
         super.mouseUp(with: event)
-        
-        // end drag
-        dragStartPos = nil
     }
     
     

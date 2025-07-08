@@ -1,7 +1,7 @@
 import MetalKit
 
 class RenderOptions: ObservableObject {
-    @Published var wireFrame: Bool = true
+    @Published var wireFrame: Bool = false
     @Published var debug: Bool = false
     @Published var showFPS: Bool = true
 }

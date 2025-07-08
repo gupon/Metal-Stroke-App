@@ -4,7 +4,7 @@
 ![Preview](Images/app_preview02.png)
 
 A stroke-drawing app built with Metal + SwiftUI.  
-Aimed for a small exercise in learning Metal, achieving the most basic features for stroke.
+Created as a small exercise in learning Metal, focusing on implementing the basic features of stroke rendering.
 
 ## Features 
 
@@ -18,34 +18,32 @@ Aimed for a small exercise in learning Metal, achieving the most basic features 
 So you can
 - make gradient along stroke
 - make tapered line
-- cross its own stroke (under or over)
+- overlap strokes with proper depth ordering (under or over)
 
 ### Make full use of instanced drawing
-- No mesh construction per-frame inside CPU 
+- No per-frame mesh construction on the CPU
   - only list of vertex & attributes are passed to shaders
 - Entire stroke is formed from basic 3 shapes (quad, triangle, pie)
-  - each deformed by vertex shader
-  - no polygon overwrapping in caps/joins
+  - each is deformed in the vertex shader
+  - no polygon overlapping in caps/joins
     - works well with gradients, alpha blending
+    - (still not working well with miter-limited angles)
 - Maximum 3 draw calls for infinite number & types of strokes
-  - draws separated only by base shapes, not by strokes
-  - each result combined with depth properly
+  - rendering is separated by base shape type, not by individual strokes
+  - all results are composited using proper depth testing
 
-## Limitation
-- Miter Limit
-- No way to set width/color/cap/join types in drawing mode 😉
-  - selected from all types by order
-
+## Limitations
+- No UI for selecting joins/caps (currently chosen randomly 😉)
 
 ## Try Drawing
 You can draw strokes manually by:
 
 - **Left click** to add a point with randomized color
+  - drag to adjust latest position
 - **Right click** to clear the canvas
 - **Return key (⏎)** to finalize a stroke
 
 ## Try Drawing (by code)
-Replace codes inside
-- `InteractiveMTKView(...)` : Handling mouse event
-- `FrameUpdater.update(...)` : Generating wave motion
-
+Modify the code in
+- `InteractiveMTKView(...)`: Handles mouse events
+- `FrameUpdater.update(...)`: Generates wave motion

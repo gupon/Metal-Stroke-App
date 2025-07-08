@@ -121,9 +121,9 @@ class StrokeModel: ObservableObject {
     }
     
     // use for drag-to-scale
-    func setFinalRadius (_ value: Float) {
+    func updateLatestPosition (_ value: SIMD2<Float>) {
         if let stroke = currentStroke {
-            stroke.vertices[stroke.vertices.count - 1].radius = value
+            stroke.vertices[stroke.vertices.count - 1].position = value
             self.isDirty = true
         }
     }

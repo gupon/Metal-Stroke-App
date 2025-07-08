@@ -5,6 +5,8 @@ using namespace metal;
 #define PI acos(-1.)
 #define PIH acos(0.)
 
+#define MITER_LIMIT 0.2
+
 
 // match with Renderer > BufferIndex
 #define BUFID_VERTEX 0
@@ -18,12 +20,15 @@ using namespace metal;
 #define BUFID_POINT_STEP 10
 #define BUFID_DEBUG 20
 
-
 // z range: 0.0(front) ~ 1.0(back)
 #define Z_MAX 0.999
 #define Z_STEP 0.001
 #define Z_WIRE_OFF -0.001
 #define Z_CENTER_LINE 0.1
+
+
+// skip draw by clipping
+constant float4 OFFSCREEN_POS = float4(10, 10, 0, 1);
 
 
 // match with StrokeModel > Vertex
@@ -73,6 +78,11 @@ float miterAngle (float a, float b) {
     return wrap_angle((a + b) * 0.5 - a, PIH);
 }
 
+bool isInsideMiterLimit (float angleA, float angleB, float width) {
+    float dAngle = wrap_angle(angleB - PI) - angleA;
+    return 1. / (2. * sin(abs(dAngle) / 2.)) * width < MITER_LIMIT;
+}
+
 float fit (float value, float from_min, float from_max, float to_min, float to_max) {
     return to_min + (value - from_min) / (from_max - from_min) * (to_max - to_min);
 }
@@ -117,7 +127,7 @@ vertex VtxOut vert_main (
     // skip drawing if end
     if (v0.end == 1) {
         out.color = float4(0);
-        out.pos = float4(v0.pos, 0, 1);
+        out.pos = OFFSCREEN_POS;
         return out;
     }
     
@@ -131,16 +141,19 @@ vertex VtxOut vert_main (
     bool isEndPt = (isStart && myVert.end == -1) || (!isStart && myVert.end == 1);
 
     if (!isEndPt) {
-        // miter ends
         uint otherVertIdx = isStart ? iid - 1 : iid + 2;
         float angleB = vectorAngle(myVert.pos, vertices[otherVertIdx].pos);
         if (isStart) angleB -= PI * sign(angleB);    // flip angle
         
+        // miter ends
         bool isClockwise = wrap_angle((angleB - angleA) * (isStart ? -1 : 1)) < 0;
         bool isInnerSide = (localpos.x > 0) == isClockwise;
         
-        if (isInnerSide || myVert.joinType == 0) // join: miter
+        if (isInsideMiterLimit(angleA, angleB, myVert.radius)
+            && (isInnerSide || myVert.joinType == 0)
+        ) {
             pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+        }
     }
     
     // add y
@@ -198,7 +211,7 @@ vertex VtxOut vert_round (
     uint idx = roundIndices[iid];
     
     StrokeVertex v0 = vertices[idx];
-    float2 pos;
+    float2 pos = float2(0);
 
     StrokeVertex vA, vB;
     float angleA, angleB;
@@ -216,11 +229,13 @@ vertex VtxOut vert_round (
         angleB = vectorAngle(v0.pos, vB.pos);
 
         if (vid == 0) {
-            bool isClockwise = wrap_angle(angleB - angleA) < 0;
-            pos = float2(1, 0) * v0.radius;
-            
-            pos *= isClockwise ? 1 : -1;
-            pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+            if (isInsideMiterLimit(angleA, angleB, v0.radius)) {
+                bool isClockwise = wrap_angle(angleB - angleA) < 0;
+                pos = float2(1, 0) * v0.radius;
+                
+                pos *= isClockwise ? 1 : -1;
+                pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+            }
         } else {
             float dAngle = wrap_angle(angleB - angleA);
             float idx_ratio = (vid - 1.0) / roundRes;
@@ -268,19 +283,28 @@ vertex VtxOut vert_bevel (
 
     float angleA = vectorAngle(vA.pos, v0.pos);
     float angleB = vectorAngle(v0.pos, vB.pos);
+    float dAngle = wrap_angle(angleB - angleA);
     
-    float2 pos;
+    bool insideMiterLimit = isInsideMiterLimit(angleA, angleB, v0.radius);
+    
+    float2 pos = float2(0);
+    
+    // skip render for 'miter' join which angle is inside limit
+    if (v0.joinType == 0 && insideMiterLimit) {
+        out.color = float4(0);
+        out.pos = OFFSCREEN_POS;
+        return out;
+    }
     
     if (vid == 0) {
-        // origin
-        bool isClockwise = wrap_angle(angleB - angleA) < 0;
-        pos = float2(1, 0) * v0.radius;
-        pos *= isClockwise ? 1 : -1;
-        pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+        // origin point
+        if (insideMiterLimit) {
+            pos = float2(1, 0) * v0.radius;
+            pos *= dAngle < 0 ? 1 : -1; // isClockwise
+            pos *= rotateSkewMat(miterAngle(angleA, angleB), true);
+        }
     } else {
-        // others
-        float dAngle = wrap_angle(angleB - angleA);
-        
+        // other points
         if (vid == 1)
             pos = float2(v0.radius, 0);
         else
@@ -305,6 +329,7 @@ vertex VtxOut vert_bevel (
 
     return out;
 }
+
 
 /*
  for debug wireframes / points
