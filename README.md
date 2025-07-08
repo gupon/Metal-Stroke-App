@@ -1,4 +1,4 @@
-# MetalStrokeApp
+# Metal Stroke App
 
 ![Preview](Images/app_preview01.png)
 ![Preview](Images/app_preview02.png)
