@@ -47,3 +47,7 @@ You can draw strokes manually by:
 Modify the code in
 - `InteractiveMTKView(...)`: Handles mouse events
 - `FrameUpdater.update(...)`: Generates wave motion
+
+## License
+This project is released under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/).  
+You can use it freely without credit or permission.
